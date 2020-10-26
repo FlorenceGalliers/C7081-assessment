@@ -1,0 +1,58 @@
+---
+title: "Can we predict house prices using known features of each house and a supervised learning approach?"
+author: "Florence Galliers"
+date: "18/10/2020"
+output: pdf_document
+---
+```{r Reading in Data, include = FALSE}
+library(openxlsx) 
+data <- read.xlsx("housing_data_assessment.xlsx")
+```
+
+## Background:
+House prices are an important part of the economy...
+
+### Objectives:
+- Understand which independent variables in the data set can be used to predict house price (the dependent variable)
+- Minimize the differences between predicted and actual house prices by using 
+model selection to choose the most accurate model.
+
+## Data:
+The data used for this analysis contains house prices and information regarding 
+the house features. It has 4600 entries. The original data set downloaded from 
+Kaggle had 17 independent variables, however I felt that 7 of these were 
+not relevant to this analysis and so they have been removed. The dependent 
+variable in this analysis will be the house price (in US dollars). 
+
+
+### Data Preparation:
+- changed 2 variables to binary, talk about this here
+- dummy variables for condition variable??
+- prices are large numbers, change to show in thousands rather than pounds?
+
+```{r, echo = FALSE}
+head(data)
+```
+
+
+
+## Methods:
+As house price is a continuous variable I have taken a supervised learning approach
+and will be using regression to look at the relationship between house price
+and features of each house.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+## Results:
+
+
+## Conclusions:
+
+
+
+### Literature Cited:
