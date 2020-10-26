@@ -11,6 +11,9 @@ data <- read.xlsx("housing_data_assessment.xlsx")
 
 ## Background:
 House prices are an important part of the economy...
+Motivate the story...
+What do we already know?
+What lessons will the story teach us?
 
 ### Objectives:
 - Understand which independent variables in the data set can be used to predict house price (the dependent variable)
@@ -18,15 +21,18 @@ House prices are an important part of the economy...
 model selection to choose the most accurate model.
 
 ## Data:
-The data used for this analysis contains house prices and information regarding 
-the house features. It has 4600 entries. The original data set downloaded from 
+The data I am going to use for this analysis contains house prices and information regarding 
+the features of each house. It has 4600 entries. The original data set downloaded from 
 Kaggle had 17 independent variables, however I felt that 7 of these were 
 not relevant to this analysis and so they have been removed. The dependent 
 variable in this analysis will be the house price (in US dollars). 
 
 
 ### Data Preparation:
-- changed 2 variables to binary, talk about this here
+- There was originally a variable called sqft_basement which gave the size of the basement if one was present, 
+however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric 
+into binary. 
+- I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated.
 - dummy variables for condition variable??
 - prices are large numbers, change to show in thousands rather than pounds?
 
@@ -35,11 +41,14 @@ head(data)
 ```
 
 
-
 ## Methods:
 As house price is a continuous variable I have taken a supervised learning approach
 and will be using regression to look at the relationship between house price
 and features of each house.
+
+Review approaches tried or considered
+
+Summary of final approach and justification of why this approach was chosen:
 
 
 ```{r setup, include=FALSE}
@@ -50,9 +59,24 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Results:
 
+Summary of major results, graphs, diagnostic outputs
+
+Strictly relevant to the objectives
+
+Must include a link to the Github repository containing a fully reproducible and documented analysis
+Reported in scientific style.
+
+
 
 ## Conclusions:
 
+~1 paragraph
 
 
 ### Literature Cited:
+3-5 peer reviewed references
+-
+-
+-
+-
+-
