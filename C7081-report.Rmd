@@ -15,6 +15,8 @@ Motivate the story...
 What do we already know?
 What lessons will the story teach us?
 
+When purchasing a house people are more likely to look only at the number of bedrooms and number of bathrooms, rather than the square foot of the house. This may be because they do not understand how square foot is calculated, or find it difficult to visualise how this translates into the house size. 
+
 ### Objectives:
 - Understand which independent variables in the data set can be used to predict house price (the dependent variable)
 - Minimize the differences between predicted and actual house prices by using 
@@ -27,12 +29,14 @@ Kaggle had 17 independent variables, however I felt that 7 of these were
 not relevant to this analysis and so they have been removed. The dependent 
 variable in this analysis will be the house price (in US dollars). 
 
+Although it is from 2014 and USA data, I feel it is a really interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from a more recent year or from the UK, and so I am staying with this data set as I think it will produce some interesting results ... or something like this.
+
 
 ### Data Preparation:
-- There was originally a variable called sqft_basement which gave the size of the basement if one was present, 
+- There was originally a variable called sqft_basement which gave the size of the basement if present, 
 however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric 
-into binary. 
-- I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated.
+into binary. It now shows 0 = no basement, 1 = basement.
+- I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated. 0 = not renovated, 1 = renovated.
 - dummy variables for condition variable??
 - prices are large numbers, change to show in thousands rather than pounds?
 
