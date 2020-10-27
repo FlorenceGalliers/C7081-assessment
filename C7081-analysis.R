@@ -82,13 +82,3 @@ hist(data$bath,
      ylab = "Frequency")
 
 
-
-
-
-
-
-data_lm <- lm(data$price ~ . -city-basement-yr_built-renovated, 
-              data = data)
-summary(data_lm)
-
-plot(data_lm)

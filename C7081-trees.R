@@ -55,3 +55,79 @@ sqrt(152564491806)
 
 # The sqrt of the MSE is around 390595, suggesting that this model leads to
 # test predictions that are within $390,595 of the true house price.
+
+set.seed(1)
+
+bag_house <- randomForest(price ~ ., 
+                          data = house.train,
+                          mtry = 9, 
+                          importance = TRUE)
+bag_house
+
+yhat_bag <- predict(bag_house, newdata = house.test)
+plot(yhat_bag, testdata)
+abline(0,1)
+
+mean((yhat_bag-testdata)^2)
+
+rf_house <- randomForest(price ~ ., 
+                         data = house.train,
+                         mtry = 3,
+                         importance = TRUE)
+
+yhat_rf <- predict(rf_house, newdata = house.test)
+
+mean((yhat_rf-testdata)^2)
+
+importance(rf_house)
+
+varImpPlot(rf_house)
+
+# This shows that across all trees considered in the random forest, the year 
+# a house was built and the sqft of the house are the two most important variables
+
+# Boosting
+
+library(gbm)
+
+boost_house <- gbm(price ~ ., 
+                   data = house.train,
+                   distribution = "gaussian",
+                   n.trees = 5000,
+                   interaction.depth = 4)
+
+summary(boost_house)
+
+# sqft of house is the most important variable
+
+# Lets produce some partial dependence plots for sqft_living and yr_built
+# these illustrate the marginal effect of the selected variables on the response
+# after integrating out the other variables
+
+par(mfrow=c(1, 2))
+
+plot(boost_house, i = "sqft_living")
+plot(boost_house, i = "yr_built")
+
+# Use boosted model to predict price on the test set
+
+yhat_boost <- predict(boost_house, 
+                      newdata = house.test,
+                      n.trees = 5000)
+
+mean((yhat_boost-testdata)^2)
+
+# boosting with a different value fo lambda
+boost_boston <- gbm(price ~ .,
+                    data = house.train,
+                    distribution = "gaussian",
+                    n.trees = 5000,
+                    interaction.depth = 4, 
+                    shrinkage = 0.2, 
+                    verbose = F)
+
+yhat_boost <- predict(boost_boston,
+                      newdata = house.test, 
+                      n.trees = 5000)
+
+mean((yhat_boost-testdata)^2)
