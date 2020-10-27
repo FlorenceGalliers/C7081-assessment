@@ -251,3 +251,17 @@ points(5, reg.summary$bic[5],
        pch = 20)
 
 # Forward and Backward Stepwise Selection
+
+regfit.fwd <- regsubsets(price ~ ., 
+                         data = data2, 
+                         nvmax = 9,
+                         method = "forward")
+
+summary(regfit.fwd)
+
+regfit.bwd <- regsubsets(price ~ ., 
+                         data = data2, 
+                         nvmax = 9, 
+                         method = "backward")
+
+summary(regfit.bwd)
