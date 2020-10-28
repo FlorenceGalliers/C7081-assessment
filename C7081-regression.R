@@ -9,7 +9,7 @@ data2 <- read.xlsx("housing_data_assessment.xlsx")
 
 # Split into training and test data sets
 
-data2 <- data2[ ,-11]
+data2 <- data2[ ,-11] # remove column 11 "city" as character variable
 
 set.seed(1)
 
@@ -29,6 +29,39 @@ lm.model <- lm(price ~ .,
 lm.pred <- predict(lm.model, house.test)
 
 mean((house.test[, "price"] - lm.pred)^2)
+
+# full linear model on all data
+
+full_lm_model <- lm(price ~ ., 
+                    data = data2)
+plot(full_lm_model)
+
+
+# VIF scores for variables to detect any multicollinearity
+library(car)
+
+vif(lm.model)
+# all the VIF scores are below 5 which suggests there are no cases of 
+# multicollinearity and so all the variables can be included
+
+# Diagnostic plots of the linear regression model
+par(mfrow=c(2,2))
+plot(lm.model)
+
+# 1. Assumption of linear relationship holds true as horizontal line
+# 2. Residuals follow line but there are some outliers potentially, 2921, 100
+# 3. Variability of residuals increases as fitted values increase - sqrt?
+# 4. Some extreme values here - 2921, 100
+
+cooks_values <- cooks.distance(full_lm_model)
+
+extreme_values <- c(100, 2387, 2921)
+
+cooks_values[extreme_values]
+
+cooks_values[cooks_values > 0.0008695652]
+
+plot(cooks_values)
 
 # Fit a ridge regression, choose lambda by cross validation
 
@@ -265,3 +298,15 @@ regfit.bwd <- regsubsets(price ~ .,
                          method = "backward")
 
 summary(regfit.bwd)
+
+# testing non linear regression
+
+poly_10 <- lm(price ~ poly(sqft_living, degree = 10), 
+             data = data2)
+
+coef(summary(poly_10))
+
+# interactions between variables
+
+summary(lm(formula = price ~ sqft_living + yr_built * bed + yr_built:condition),
+        data = data2)
