@@ -31,19 +31,21 @@ summary(tree_house)
 plot(tree_house)
 text(tree_house, pretty = 0, cex = 0.8)
 
+tree_house
+
 # Tree only uses one variable, and indicates that a higher sqft of living
 # space leads to a higher house price.
 
 cv_tree <- cv.tree(tree_house)
 plot(cv_tree$size, cv_tree$dev, type = "b")
 
-prunedtree <- prune.tree(tree_house, best = 4)
+prunedtree <- prune.tree(tree_house, best = 5)
 plot(prunedtree)
 text(prunedtree, pretty = 0)
 
 
-# Use the pruned tree to make predctions on the test set as this tree
-# had the lowest cross validation error
+# The pruned tree and the unpruned tree have the same 
+# cross validation error so we can use either to make predictions
 
 yhat <- predict(prunedtree, newdata = house.test)
 testdata <- house.test[ ,"price"]
@@ -69,6 +71,9 @@ plot(yhat_bag, testdata)
 abline(0,1)
 
 mean((yhat_bag-testdata)^2)
+sqrt(200502311145)
+# this suggests that the model leads to test predictions that are within 
+# $447,775 of the true house price, worse than above.
 
 rf_house <- randomForest(price ~ ., 
                          data = house.train,
@@ -77,7 +82,11 @@ rf_house <- randomForest(price ~ .,
 
 yhat_rf <- predict(rf_house, newdata = house.test)
 
+
 mean((yhat_rf-testdata)^2)
+sqrt(148879274522)
+# this suggests that this model using 3 variables leads to test predictions
+# that are $385,849 within the true house price. Better than the two trees above
 
 importance(rf_house)
 
@@ -98,13 +107,13 @@ boost_house <- gbm(price ~ .,
 
 summary(boost_house)
 
-# sqft of house is the most important variable
+# sqft of house is the most important variable and then yr_built
 
 # Lets produce some partial dependence plots for sqft_living and yr_built
 # these illustrate the marginal effect of the selected variables on the response
 # after integrating out the other variables
 
-par(mfrow=c(1, 2))
+par(mfrow=c(2, 1))
 
 plot(boost_house, i = "sqft_living")
 plot(boost_house, i = "yr_built")
@@ -116,8 +125,10 @@ yhat_boost <- predict(boost_house,
                       n.trees = 5000)
 
 mean((yhat_boost-testdata)^2)
+sqrt(218630375438)
+# worse performance than the above trees.
 
-# boosting with a different value fo lambda
+# boosting with a different value of lambda
 boost_boston <- gbm(price ~ .,
                     data = house.train,
                     distribution = "gaussian",
@@ -131,3 +142,6 @@ yhat_boost <- predict(boost_boston,
                       n.trees = 5000)
 
 mean((yhat_boost-testdata)^2)
+sqrt(2.33353e+11)
+# even worse!
+

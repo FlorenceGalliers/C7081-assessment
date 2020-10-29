@@ -2,66 +2,75 @@
 ## 2020-10-27
 ## C7081-Assessment
 
-# Set WD, Read in Data
+# set working directory
 setwd("~/Google Drive/Harper/1 Statistical Analysis for Data Science/Asssesment/github-C7081/C7081-assessment")
+# read in data
 library(openxlsx)
 data2 <- read.xlsx("housing_data_assessment.xlsx")
+data <- read.xlsx("housing_data_assessment.xlsx")
+data$city <- as.factor(data$city)
+plot(data$city, data$price)
 
-# Split into training and test data sets
-
+# remove outliers
+outliers <- c(100, 2387, 2921)
+data2 <- data2[-outliers, ]
+# data preparation
 data2 <- data2[ ,-11] # remove column 11 "city" as character variable
+data2$condition <- as.factor(data2$condition) # make condition variable a factor
+data2$renovated <- as.factor(data2$renovated)
+data2$basement <- as.factor(data2$basement)
 
+# log the response variable
+data2$price <- log(data2$price)
+
+# look if any values have price= 0, assign them to variable
+zero_values <- which(data2$price == 0)
+# remove these from the data set as house price cannot = 0
+data2 <- data2[-zero_values, ]
+
+barplot(data2$price, data2$renovated)
+
+plot(data2$price, data2$renovated)
+plot(data2$price, data2$basement)
+
+
+# split into training and test data sets
 set.seed(1)
-
 train <- sample(c(TRUE, FALSE), nrow(data2), rep = TRUE)
-
 test <- (!train)
+training_set <- data2[train,]
+testing_set <- data2[test,]
 
-house.train <- data2[train,]
-
-house.test <- data2[test,]
-
-# Fit linear model using least squares on train data, report test error
-
-lm.model <- lm(price ~ ., 
-               data = house.train)
-
-lm.pred <- predict(lm.model, house.test)
-
-mean((house.test[, "price"] - lm.pred)^2)
-
-# full linear model on all data
-
-full_lm_model <- lm(price ~ ., 
-                    data = data2)
-plot(full_lm_model)
-
+# fit linear model using least squares on training data
+lm_model <- lm(price ~ ., 
+               data = training_set)
+# make predictions on test set
+lm_pred <- predict(lm_model, testing_set) 
+# calculate MSE
+mean((testing_set[, "price"] - lm_pred)^2)
+summary(lm_model)
 
 # VIF scores for variables to detect any multicollinearity
 library(car)
-
-vif(lm.model)
+vif(lm_model)
 # all the VIF scores are below 5 which suggests there are no cases of 
 # multicollinearity and so all the variables can be included
 
 # Diagnostic plots of the linear regression model
 par(mfrow=c(2,2))
-plot(lm.model)
+plot(lm_model)
 
 # 1. Assumption of linear relationship holds true as horizontal line
 # 2. Residuals follow line but there are some outliers potentially, 2921, 100
-# 3. Variability of residuals increases as fitted values increase - sqrt?
-# 4. Some extreme values here - 2921, 100
+# 3. Variability of residuals increases as fitted values increase
 
-cooks_values <- cooks.distance(full_lm_model)
+# Breusch Pagen Test for homoscedasticity
+bptest(lm_model) # p < 0.05 so reject null hypothesis, we have heteroscedasticity here
 
-extreme_values <- c(100, 2387, 2921)
+# 4. No points exceeding Cook's distance
 
-cooks_values[extreme_values]
-
-cooks_values[cooks_values > 0.0008695652]
-
-plot(cooks_values)
+par(mfrow=c(1,1))
+hist(data2$price, breaks = 100)
 
 # Fit a ridge regression, choose lambda by cross validation
 
@@ -310,3 +319,5 @@ coef(summary(poly_10))
 
 summary(lm(formula = price ~ sqft_living + yr_built * bed + yr_built:condition),
         data = data2)
+
+
