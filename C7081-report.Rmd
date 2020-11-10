@@ -7,7 +7,8 @@ output: pdf_document
 ```{r set wd / libraries / reading in data, include = FALSE}
 setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
 
-library()
+library(knitr)
+library(ggplot2)
 
 data <- read.csv(file = "original-data.csv")
 ```
@@ -27,7 +28,7 @@ When purchasing a house people are more likely to look only at the number of bed
 ## Data:
 The data for this analysis contains house prices and information regarding the features of each house. It has 4600 entries. The original data set downloaded from Kaggle had 17 independent variables, however I felt that 7 of these were not relevant to this analysis and so they have been removed. The dependent variable in this analysis will be the house price (in US dollars). 
 
-Although it is from 2014 and from houses in the USA, I feel it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
+This data is from houses sold in 2014 in Washington, USA. However it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
 
 ### Data Preparation:
 - There was originally a variable called sqft_basement which gave the size of the basement if present, 
@@ -52,7 +53,58 @@ data$yr_renovated <- ifelse(data$yr_renovated == 0, 0, 1)
 # change column name from yr_renovated to if_renovated
 names(data)[names(data) =="yr_renovated"] <- "if_renovated"
 
-# remove zero values for house price
+# look if any values are = 0, assign them to variable
+zero_values <- which(data$price == 0)
+# remove these from the data set as house price cannot = 0
+data <- data[-zero_values,]
+# we are now left with 4551 observations
+
+#convert yr_built variable into age
+end_year <- 2014 #year data is from
+#calculate age of each house is years
+data$yr_built <- end_year - data$yr_built
+#change column name from yr_built to house_age
+names(data)[names(data)=="yr_built"] <- "house_age"
+
+#convert price variable into thousands of dollars
+data$price <- data$price/1000
+
+# remove outliers
+outliers <- c(100, 2387, 2921)
+data <- data[-outliers, ]
+
+# data2 now contains all variables except from city, this will be looked at later
+data2 <- data[ ,-11] # remove column 11 "city" as character variable
+
+data2$condition <- as.factor(data2$condition) # make condition variable a factor
+data2$if_renovated <- as.factor(data2$if_renovated) # make renovated variable a factor
+data2$if_basement <- as.factor(data2$if_basement) # make basement variable a factor
+
+```
+
+The remaining variables and their descriptions are shown in Table 1:
+
+```{r, Table 1, echo = FALSE}
+
+#insert table 1
+data_descriptions <- c("House sale price in thousands of US dollars", 
+                       "Number of bedrooms",
+                       "Number of bathrooms",
+                       "Area of house in square feet",
+                       "Area of whole housing lot in square feet",
+                       "Number of floors in the house",
+                       "Condition of house, 1 to 5",
+                       "1 = if house has a basement, 0 = no basement",
+                       "Year that the house was built subtracted from 2014",
+                       "1 = if house has been renovated, 0 = if no renovation",
+                       "Location of house to the nearest city in Washington, USA")
+
+data_dictionary <- data.frame(names(data), data_descriptions)
+
+kable(data_dictionary,
+      col.names = c("Variable", "Description"),
+      caption = "Data Dictionary")
+
 ```
 
 
@@ -63,11 +115,40 @@ Review approaches tried or considered
 
 Summary of final approach and justification of why this approach was chosen:
 
+```{r, splitting into training and test set}
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+set.seed(2) 
+n = nrow(data2) #number of rows
+train_index = sample(1:n, size = round(0.8*n), replace=FALSE) 
+train = data2[train_index ,] #takes 80% of the data for training set
+test = data2[-train_index ,] #remaining 20% for the test set
 
 ```
+
+```{r, lm using least squares}
+lm_model <- lm(price ~ .-condition-if_renovated, 
+               data = train)
+# make predictions on test set
+lm_pred <- predict(lm_model, test) 
+# calculate MSE
+mean((test[, "price"] - lm_pred)^2)
+summary(lm_model)
+
+```
+
+
+
+
+```{r setup, include=FALSE}
+#convert city variable from character to factor
+data$city <- as.factor(data$city)
+#obtain summary for this variable
+summary(data$city)
+
+
+```
+
+
 
 
 ## Results:
