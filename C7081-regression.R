@@ -7,9 +7,10 @@ setwd("~/Google Drive/Harper/1 Statistical Analysis for Data Science/Asssesment/
 # read in data
 library(openxlsx)
 data2 <- read.xlsx("housing_data_assessment.xlsx")
-data <- read.xlsx("housing_data_assessment.xlsx")
-data$city <- as.factor(data$city)
-plot(data$city, data$price)
+
+# data <- read.xlsx("housing_data_assessment.xlsx")
+# data$city <- as.factor(data$city)
+# plot(data$city, data$price)
 
 # remove outliers
 outliers <- c(100, 2387, 2921)
@@ -17,22 +18,38 @@ data2 <- data2[-outliers, ]
 # data preparation
 data2 <- data2[ ,-11] # remove column 11 "city" as character variable
 data2$condition <- as.factor(data2$condition) # make condition variable a factor
-data2$renovated <- as.factor(data2$renovated)
-data2$basement <- as.factor(data2$basement)
+data2$renovated <- as.factor(data2$renovated) # make renovated variable a factor
+data2$basement <- as.factor(data2$basement) # make basement variable a factor
 
 # log the response variable
-data2$price <- log(data2$price)
+# data2$price <- log(data2$price)
 
 # look if any values have price= 0, assign them to variable
 zero_values <- which(data2$price == 0)
 # remove these from the data set as house price cannot = 0
 data2 <- data2[-zero_values, ]
 
-barplot(data2$price, data2$renovated)
+library(psych)
+pairs.panels(data2, col="red")
 
-plot(data2$price, data2$renovated)
-plot(data2$price, data2$basement)
+library(ggplot2)
+library(ggcorrplot)
 
+corr_variables <- data.frame(data2$price, data2$bed, data2$bath, data2$sqft_living, 
+                    data2$sqft_total, data2$floors, data2$yr_built)
+
+cor_mat <- cor(corr_variables)
+
+p_mat <- cor_pmat(corr_variables)
+
+ggcorrplot(cor_mat, 
+           method = "circle", 
+           type = "lower",
+           p.mat = p_mat,
+           lab = T, lab_size = 2.5)
+# from this correlation we can see that the house price is most strongly 
+# positively correlated with sqft_living, no of bathrooms, and then no of 
+# bedrooms and no of floors.
 
 # split into training and test data sets
 set.seed(1)

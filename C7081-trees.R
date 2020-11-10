@@ -7,22 +7,23 @@ setwd("~/Google Drive/Harper/1 Statistical Analysis for Data Science/Asssesment/
 library(openxlsx)
 data2 <- read.xlsx("housing_data_assessment.xlsx")
 
+# remove outliers
+outliers <- c(100, 2387, 2921)
+data2 <- data2[-outliers, ]
+# data preparation
+data2 <- data2[ ,-11] # remove column 11 "city" as character variable
+data2$condition <- as.factor(data2$condition) # make condition variable a factor
+data2$renovated <- as.factor(data2$renovated) # make renovated variable a factor
+data2$basement <- as.factor(data2$basement) # make basement variable a factor
+
 # Split into training and test data sets
-
-data2 <- data2[ ,-11]
-
 set.seed(1)
-
 train <- sample(c(TRUE, FALSE), nrow(data2), rep = TRUE)
-
 test <- (!train)
-
 house.train <- data2[train,]
-
 house.test <- data2[test,]
 
 # Regression Tree
-
 tree_house <- tree(price ~ ., 
                    data = house.train)
 
@@ -33,16 +34,15 @@ text(tree_house, pretty = 0, cex = 0.8)
 
 tree_house
 
-# Tree only uses one variable, and indicates that a higher sqft of living
-# space leads to a higher house price.
+# Tree indicates that sqft_living is the most important variable, but year built 
+# and condition are also important.
 
 cv_tree <- cv.tree(tree_house)
 plot(cv_tree$size, cv_tree$dev, type = "b")
 
-prunedtree <- prune.tree(tree_house, best = 5)
+prunedtree <- prune.tree(tree_house, best = 8)
 plot(prunedtree)
 text(prunedtree, pretty = 0)
-
 
 # The pruned tree and the unpruned tree have the same 
 # cross validation error so we can use either to make predictions
