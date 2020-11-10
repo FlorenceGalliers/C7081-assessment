@@ -4,7 +4,7 @@
 ####
 
 # read in data file
-setwd("~/Google Drive/Harper/1 Statistical Analysis for Data Science/Asssesment/github-C7081/C7081-assessment")
+setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
 library(openxlsx)
 data <- read.xlsx("housing_data_assessment.xlsx")
 

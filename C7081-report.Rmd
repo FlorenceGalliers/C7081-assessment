@@ -4,9 +4,12 @@ author: "Florence Galliers"
 date: "18/10/2020"
 output: pdf_document
 ---
-```{r Reading in Data, include = FALSE}
-library(openxlsx) 
-data <- read.xlsx("housing_data_assessment.xlsx")
+```{r set wd / libraries / reading in data, include = FALSE}
+setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
+
+library()
+
+data <- read.csv(file = "original-data.csv")
 ```
 
 ## Background:
@@ -22,25 +25,34 @@ When purchasing a house people are more likely to look only at the number of bed
 - Minimize the differences between predicted and actual house prices by using model selection to choose the most accurate model.
 
 ## Data:
-The data for this analysis contains house prices and information regarding 
-the features of each house. It has 4600 entries. The original data set downloaded from 
-Kaggle had 17 independent variables, however I felt that 7 of these were 
-not relevant to this analysis and so they have been removed. The dependent 
-variable in this analysis will be the house price (in US dollars). 
+The data for this analysis contains house prices and information regarding the features of each house. It has 4600 entries. The original data set downloaded from Kaggle had 17 independent variables, however I felt that 7 of these were not relevant to this analysis and so they have been removed. The dependent variable in this analysis will be the house price (in US dollars). 
 
-Although it is from 2014 and USA data, I feel it is a really interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from a more recent year or from the UK, and so I am staying with this data set as I think it will produce some interesting results ... or something like this.
+Although it is from 2014 and from houses in the USA, I feel it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
 
 ### Data Preparation:
 - There was originally a variable called sqft_basement which gave the size of the basement if present, 
 however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric 
-into binary. It now shows 0 = no basement, 1 = basement.
+into binary. It now shows 0 = no basement, 1 = basement. 
 - I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated. 0 = not renovated, 1 = renovated.
-- Show code for how to change these variables?
+- Check if there are any zero values for the price variable as these are not acceptable in a housing price situation, a house cannot cost nothing, so we must remove these and assume they are errors in the data set.
 - Remove outliers
-- Check if there are any zero values as these are not acceptable in a housing price sitation, so we must remove these.
 
 ```{r, echo = FALSE}
+# removing unwanted variables from original kaggle dataset
+variables_to_remove <- c(1, 8, 9, 11, 15, 17, 18)
+data <- data[ ,-variables_to_remove]
 
+# changing variable sqft_basement into binary variable basement
+data$sqft_basement <- ifelse(data$sqft_basement == 0, 0, 1)
+# change column name from sqft_basement to if_basement
+names(data)[names(data) =="sqft_basement"] <- "if_basement"
+
+# changing yr_renovated into binary variable renovates
+data$yr_renovated <- ifelse(data$yr_renovated == 0, 0, 1)
+# change column name from yr_renovated to if_renovated
+names(data)[names(data) =="yr_renovated"] <- "if_renovated"
+
+# remove zero values for house price
 ```
 
 
