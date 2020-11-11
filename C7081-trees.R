@@ -51,7 +51,6 @@ yhat <- predict(prunedtree, newdata = house.test)
 testdata <- house.test[ ,"price"]
 plot(yhat, testdata)
 abline(0, 1)
-
 mean((yhat-testdata)^2)
 sqrt(152564491806)
 

@@ -2,39 +2,46 @@
 title: "Can we predict house prices using known features of each house and a supervised learning approach?"
 author: "Florence Galliers"
 date: "18/10/2020"
-output: pdf_document
+output: 
+  pdf_document:
+    toc: true #table of contents true, default depth 3
+    number_sections: true
+    df_print: kable
 ---
-```{r set wd / libraries / reading in data, include = FALSE}
+```{r, set wd / libraries / reading in data, include = FALSE}
 setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
 
 library(knitr)
 library(ggplot2)
+library(glmnet)
+library(pls)
+library(leaps)
+library(tree)
+library(randomForest)
+library(gbm)
+
 
 data <- read.csv(file = "original-data.csv")
 ```
 
-## Background:
-House prices are an important part of the economy...
-Motivate the story...
-What do we already know?
-What lessons will the story teach us?
 
-When purchasing a house people are more likely to look only at the number of bedrooms and number of bathrooms, rather than the square foot of the house. This may be because they do not understand how square foot is calculated, or find it difficult to visualise how this translates into the house size. 
+# Background:
 
-### Objectives:
-- Understand which independent variables in the data set can be used to predict house price (the dependent variable)
+
+## Objectives:
+- Understand which attributes of houses given in the data set can be used to effectively construct a prediction model for house price (dependent variable).
 - Minimize the differences between predicted and actual house prices by using model selection to choose the most accurate model.
 
 ## Data:
-The data for this analysis contains house prices and information regarding the features of each house. It has 4600 entries. The original data set downloaded from Kaggle had 17 independent variables, however I felt that 7 of these were not relevant to this analysis and so they have been removed. The dependent variable in this analysis will be the house price (in US dollars). 
+The data for this analysis contains house prices and key attributes of each house. It has 4600 entries. The original data set downloaded from Kaggle had 17 independent variables, however I felt that 7 of these were not relevant to this analysis and so they have been removed. 
 
 This data is from houses sold in 2014 in Washington, USA. However it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
 
 ### Data Preparation:
 - There was originally a variable called sqft_basement which gave the size of the basement if present, 
 however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric 
-into binary. It now shows 0 = no basement, 1 = basement. 
-- I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated. 0 = not renovated, 1 = renovated.
+into binary.
+- I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated. 
 - Check if there are any zero values for the price variable as these are not acceptable in a housing price situation, a house cannot cost nothing, so we must remove these and assume they are errors in the data set.
 - Remove outliers
 
@@ -108,10 +115,10 @@ kable(data_dictionary,
 ```
 
 
-## Methods:
+# Methods:
 As house price is a continuous variable I have taken a supervised learning approach and will be using regression to look at the relationship between house price and features of each house.
 
-Review approaches tried or considered
+Review approaches tried or considered...
 
 Summary of final approach and justification of why this approach was chosen:
 
@@ -134,8 +141,212 @@ lm_pred <- predict(lm_model, test)
 mean((test[, "price"] - lm_pred)^2)
 summary(lm_model)
 
+# Diagnostic plots of the linear regression model
+par(mfrow=c(2,2))
+plot(lm_model)
+
 ```
 
+```{r, ridge lasso PCR PLS, include = FALSE}
+# Fit a ridge regression, choose lambda by cross validation
+set.seed(1)
+x_train <- model.matrix(price ~ ., 
+                  data = train)[,-1]
+y_train <- train$price
+
+x_test <- model.matrix(price ~ ., 
+                  data = test)[,-1]
+y_test <- test$price
+
+
+cv.ridge <- cv.glmnet(x_train, 
+                      y_train, alpha = 0)
+plot(cv.ridge)
+best.lambda <- cv.ridge$lambda.min
+best.lambda #24.35134
+
+# Report test error
+ridge.mod <- glmnet(x_train, 
+                    y_train, 
+                    alpha = 0)
+ridge.pred <- predict(ridge.mod, 
+                      s = best.lambda,
+                      newx = x_test)
+mean((ridge.pred - y_test)^2)
+#69046.74 test error
+
+# Fit a lasso model on the training set, choose lambda by C-V
+lasso.mod <- glmnet(x_train, 
+                    y_train, 
+                    alpha = 1)
+plot(lasso.mod)
+set.seed(1)
+cv.lasso <- cv.glmnet(x_train, 
+                      y_train,
+                      alpha = 1)
+plot(cv.lasso)
+best.lamb <- cv.lasso$lambda.min
+lasso.pred <- predict(lasso.mod, s = best.lamb, 
+                      newx = x_test)
+
+# Report test error and number of non zero coefficients
+mean((lasso.pred - y_test)^2)
+out <- glmnet(x_train, y_train, alpha = 1)
+lasso.coef <- predict(out, type = "coefficients", 
+                      s = best.lamb)
+lasso.coef
+lasso.coef[lasso.coef!=0]
+
+# Fit PCR Model on training data, M chosen by C-V
+set.seed(2)
+pcr.fit <- pcr(price ~ ., 
+               data = train,
+               scale = TRUE,
+               validation = "CV")
+summary(pcr.fit)
+validationplot(pcr.fit, val.type = "MSEP") 
+# shows the smallest C-V error is when M = 11 
+names(pcr.fit)
+# Report test error, and value of M selected
+pcr.pred <- predict(pcr.fit, x_test, ncomp = 11)
+mean((pcr.pred - y_test)^2)
+#68666.58
+
+# Fit PLS Model to training data, C-V
+pls.fit <- plsr(price ~ .,
+                data = train,
+                scale = TRUE,
+                validation = "CV")
+summary(pls.fit)
+validationplot(pls.fit, val.type = "MSEP")
+
+# Report test error, and value of M selected
+pls.pred <- predict(pls.fit, x_test, ncomp = 4)
+mean((pls.pred - y_test)^2)
+pls.fit <- plsr(price ~ ., data = data2, scale = TRUE, ncomp = 4)
+summary(pls.fit)
+```
+
+```{r, trees, include = FALSE}
+
+# Regression Tree
+tree_house <- tree(price ~ ., 
+                   data = train)
+
+summary(tree_house)
+
+plot(tree_house) 
+text(tree_house, pretty = 0, cex = 0.8)
+
+tree_house
+
+# Tree indicates that sqft_living is the most important variable
+
+cv_tree <- cv.tree(tree_house)
+plot(cv_tree$size, cv_tree$dev, type = "b")
+
+prunedtree <- prune.tree(tree_house, best = 5)
+plot(prunedtree)
+text(prunedtree, pretty = 0)
+
+# The pruned tree and the unpruned tree have the same 
+# cross validation error so we can use either to make predictions
+
+yhat <- predict(prunedtree, newdata = test)
+testdata <- test[ ,"price"]
+plot(yhat, testdata)
+abline(0, 1)
+
+mean((yhat-testdata)^2)
+sqrt(152564491806)
+
+# The sqrt of the MSE is around 390595, suggesting that this model leads to
+# test predictions that are within $390,595 of the true house price.
+
+set.seed(1)
+bag_house <- randomForest(price ~ ., 
+                          data = train,
+                          mtry = 9, 
+                          importance = TRUE)
+bag_house
+
+yhat_bag <- predict(bag_house, newdata = test)
+plot(yhat_bag, testdata)
+abline(0,1)
+
+mean((yhat_bag-testdata)^2)
+sqrt(200502311145)
+# this suggests that the model leads to test predictions that are within 
+# $447,775 of the true house price, worse than above.
+
+rf_house <- randomForest(price ~ ., 
+                         data = train,
+                         mtry = 3,
+                         importance = TRUE)
+
+yhat_rf <- predict(rf_house, newdata = test)
+
+mean((yhat_rf-testdata)^2)
+sqrt(148879274522)
+# this suggests that this model using 3 variables leads to test predictions
+# that are $385,849 within the true house price. Better than the two trees above
+
+importance(rf_house)
+varImpPlot(rf_house)
+
+# This shows that across all trees considered in the random forest, the age 
+# of a house and the sqft of the house are the two most important variables
+
+# Boosting
+boost_house <- gbm(price ~ ., 
+                   data = train,
+                   distribution = "gaussian",
+                   n.trees = 5000,
+                   interaction.depth = 4)
+
+summary(boost_house)
+
+# sqft of house is the most important variable and then sqft_lot and house age
+
+# Lets produce some partial dependence plots for sqft_living and yr_built
+# these illustrate the marginal effect of the selected variables on the response
+# after integrating out the other variables
+
+par(mfrow=c(2, 1))
+
+plot(boost_house, i = "sqft_living")
+plot(boost_house, i = "house_age")
+
+# Use boosted model to predict price on the test set
+
+yhat_boost <- predict(boost_house, 
+                      newdata = test,
+                      n.trees = 5000)
+
+mean((yhat_boost-testdata)^2)
+sqrt(218630375438)
+# worse performance than the above trees.
+
+# boosting with a different value of lambda
+boost_boston <- gbm(price ~ .,
+                    data = train,
+                    distribution = "gaussian",
+                    n.trees = 5000,
+                    interaction.depth = 4, 
+                    shrinkage = 0.2, 
+                    verbose = F)
+
+yhat_boost <- predict(boost_boston,
+                      newdata = test, 
+                      n.trees = 5000)
+
+mean((yhat_boost-testdata)^2)
+sqrt(2.33353e+11)
+# even worse!
+
+
+
+```
 
 
 
@@ -151,7 +362,7 @@ summary(data$city)
 
 
 
-## Results:
+# Results:
 
 Summary of major results, graphs, diagnostic outputs
 
@@ -167,7 +378,8 @@ Reported in scientific style.
 ~1 paragraph
 
 
-### Literature Cited:
+# References
+
 3-5 peer reviewed references
 -
 -
