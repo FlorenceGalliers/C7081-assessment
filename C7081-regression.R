@@ -90,9 +90,7 @@ par(mfrow=c(1,1))
 hist(data2$price, breaks = 100)
 
 # Fit a ridge regression, choose lambda by cross validation
-
 library(glmnet)
-
 set.seed(1)
 
 x <- model.matrix(price ~ ., data = data2)[,-1]

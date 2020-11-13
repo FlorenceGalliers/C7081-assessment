@@ -32,18 +32,24 @@ data <- read.csv(file = "original-data.csv")
 - Understand which attributes of houses given in the data set can be used to effectively construct a prediction model for house price (dependent variable).
 - Minimize the differences between predicted and actual house prices by using model selection to choose the most accurate model.
 
-## Data:
-The data for this analysis contains house prices and key attributes of each house. It has 4600 entries. The original data set downloaded from Kaggle had 17 independent variables, however I felt that 7 of these were not relevant to this analysis and so they have been removed. 
+# Data:
+This data is from houses sold in 2014 in Washington, USA. It contains the sale price along with attributes of each house. There are 4600 entries and 17 variables in the original data set. 
 
-This data is from houses sold in 2014 in Washington, USA. However it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
+Although the data is 6 years old, it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from a more recent year, or from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
 
-### Data Preparation:
-- There was originally a variable called sqft_basement which gave the size of the basement if present, 
-however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric 
-into binary.
-- I also changed the variable year_renovated into a binary variable, as again, not all the houses had been renovated. 
-- Check if there are any zero values for the price variable as these are not acceptable in a housing price situation, a house cannot cost nothing, so we must remove these and assume they are errors in the data set.
-- Remove outliers
+## Data Preparation:
+After some exploratory data analysis it became clear that some of the variables in the data set had missing values or were not going to be relevant to this analysis. After removing them we are left with 11 variables.
+
+There was originally a variable called sqft_basement which gave the size of the basement if present, 
+however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric into binary (if_basement). I also changed the variable year_renovated into a binary variable (if_renovated), as again, not all the houses had been renovated. 
+
+I carried out a check to see if there were any zero values for the price variable as these are not acceptable in a housing price situation, a house cannot cost nothing. These were removed from the data set.
+
+After carrying out a preliminary linear regression model and plotting the diagnostic plots, using Cook's distanced I identified three data entries classed as outliers. These were removed from the data set.
+
+The year_built variable from the original data set has been changed into a house_age variable by subtracting the year built from 2014.
+
+The price variable was changed into thousands of dollars to make it a more manageable variable.
 
 ```{r, echo = FALSE}
 # removing unwanted variables from original kaggle dataset
