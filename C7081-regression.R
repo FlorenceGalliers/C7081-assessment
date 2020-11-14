@@ -67,6 +67,14 @@ lm_pred <- predict(lm_model, testing_set)
 mean((testing_set[, "price"] - lm_pred)^2)
 summary(lm_model)
 
+single_lm <- lm(price ~ data2$sqft_living,
+                data = data2)
+
+plot(data2$sqft_living, data2$price,
+     main = "Price vs Squarefoot of House Regression Model")
+abline(lm(data2$price ~ data2$sqft_living))
+
+
 # VIF scores for variables to detect any multicollinearity
 library(car)
 vif(lm_model)
