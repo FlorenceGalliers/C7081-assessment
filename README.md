@@ -10,6 +10,7 @@ This is the original data, as downloaded from Kaggle (https://www.kaggle.com/shr
 This is the cleaned dataset that I used for my anaysis.
 
 **Scripts**
+
 3. EDA.R
 Exploratory Data Analysis R script.
 
