@@ -29,69 +29,15 @@ data <- read.csv(file = "original-data.csv")
 
 
 ## Objectives:
-- Understand which attributes of houses given in the data set can be used to effectively construct a prediction model for house price (dependent variable).
-- Minimize the differences between predicted and actual house prices by using model selection to choose the most accurate model.
+
 
 # Data:
-This data is from houses sold in 2014 in Washington, USA. It contains the sale price along with attributes of each house. There are 4600 entries and 17 variables in the original data set. 
 
-Although the data is 6 years old, it is an interesting data set that contains a large amount of information and number of variables. I was not able to find a similar data set from a more recent year, or from the UK, and so I am going to go ahead with this data set as I feel it will produce some interesting results.
 
 ## Data Preparation:
-After some exploratory data analysis it became clear that some of the variables in the data set had missing values or were not going to be relevant to this analysis. After removing them we are left with 11 variables.
 
-There was originally a variable called sqft_basement which gave the size of the basement if present, 
-however a lot of houses did not have basement so I felt it would be more useful to turn this variable from numeric into binary (if_basement). I also changed the variable year_renovated into a binary variable (if_renovated), as again, not all the houses had been renovated. 
-
-I carried out a check to see if there were any zero values for the price variable as these are not acceptable in a housing price situation, a house cannot cost nothing. These were removed from the data set.
-
-After carrying out a preliminary linear regression model and plotting the diagnostic plots, using Cook's distanced I identified three data entries classed as outliers. These were removed from the data set.
-
-The year_built variable from the original data set has been changed into a house_age variable by subtracting the year built from 2014.
-
-The price variable was changed into thousands of dollars to make it a more manageable variable.
 
 ```{r, echo = FALSE}
-# removing unwanted variables from original kaggle dataset
-variables_to_remove <- c(1, 8, 9, 11, 15, 17, 18)
-data <- data[ ,-variables_to_remove]
-
-# changing variable sqft_basement into binary variable basement
-data$sqft_basement <- ifelse(data$sqft_basement == 0, 0, 1)
-# change column name from sqft_basement to if_basement
-names(data)[names(data) =="sqft_basement"] <- "if_basement"
-
-# changing yr_renovated into binary variable renovates
-data$yr_renovated <- ifelse(data$yr_renovated == 0, 0, 1)
-# change column name from yr_renovated to if_renovated
-names(data)[names(data) =="yr_renovated"] <- "if_renovated"
-
-# look if any values are = 0, assign them to variable
-zero_values <- which(data$price == 0)
-# remove these from the data set as house price cannot = 0
-data <- data[-zero_values,]
-# we are now left with 4551 observations
-
-#convert yr_built variable into age
-end_year <- 2014 #year data is from
-#calculate age of each house is years
-data$yr_built <- end_year - data$yr_built
-#change column name from yr_built to house_age
-names(data)[names(data)=="yr_built"] <- "house_age"
-
-#convert price variable into thousands of dollars
-data$price <- data$price/1000
-
-# remove outliers
-outliers <- c(100, 2387, 2921)
-data <- data[-outliers, ]
-
-# data2 now contains all variables except from city, this will be looked at later
-data2 <- data[ ,-11] # remove column 11 "city" as character variable
-
-data2$condition <- as.factor(data2$condition) # make condition variable a factor
-data2$if_renovated <- as.factor(data2$if_renovated) # make renovated variable a factor
-data2$if_basement <- as.factor(data2$if_basement) # make basement variable a factor
 
 ```
 
@@ -122,11 +68,6 @@ kable(data_dictionary,
 
 
 # Methods:
-As house price is a continuous variable I have taken a supervised learning approach and will be using regression to look at the relationship between house price and features of each house.
-
-Review approaches tried or considered...
-
-Summary of final approach and justification of why this approach was chosen:
 
 ```{r, splitting into training and test set}
 
@@ -138,8 +79,8 @@ test = data2[-train_index ,] #remaining 20% for the test set
 
 ```
 
-```{r, lm using least squares}
-lm_model <- lm(price ~ .-condition-if_renovated, 
+```{r, least squares}
+lm_model <- lm(price ~ ., 
                data = train)
 # make predictions on test set
 lm_pred <- predict(lm_model, test) 
@@ -153,242 +94,26 @@ plot(lm_model)
 
 ```
 
-```{r, ridge lasso PCR PLS, include = FALSE}
-# Fit a ridge regression, choose lambda by cross validation
-set.seed(1)
-x_train <- model.matrix(price ~ ., 
-                  data = train)[,-1]
-y_train <- train$price
+```{r, include = FALSE}
 
-x_test <- model.matrix(price ~ ., 
-                  data = test)[,-1]
-y_test <- test$price
-
-
-cv.ridge <- cv.glmnet(x_train, 
-                      y_train, alpha = 0)
-plot(cv.ridge)
-best.lambda <- cv.ridge$lambda.min
-best.lambda #24.35134
-
-# Report test error
-ridge.mod <- glmnet(x_train, 
-                    y_train, 
-                    alpha = 0)
-ridge.pred <- predict(ridge.mod, 
-                      s = best.lambda,
-                      newx = x_test)
-mean((ridge.pred - y_test)^2)
-#69046.74 test error
-
-# Fit a lasso model on the training set, choose lambda by C-V
-lasso.mod <- glmnet(x_train, 
-                    y_train, 
-                    alpha = 1)
-plot(lasso.mod)
-set.seed(1)
-cv.lasso <- cv.glmnet(x_train, 
-                      y_train,
-                      alpha = 1)
-plot(cv.lasso)
-best.lamb <- cv.lasso$lambda.min
-lasso.pred <- predict(lasso.mod, s = best.lamb, 
-                      newx = x_test)
-
-# Report test error and number of non zero coefficients
-mean((lasso.pred - y_test)^2)
-out <- glmnet(x_train, y_train, alpha = 1)
-lasso.coef <- predict(out, type = "coefficients", 
-                      s = best.lamb)
-lasso.coef
-lasso.coef[lasso.coef!=0]
-
-# Fit PCR Model on training data, M chosen by C-V
-set.seed(2)
-pcr.fit <- pcr(price ~ ., 
-               data = train,
-               scale = TRUE,
-               validation = "CV")
-summary(pcr.fit)
-validationplot(pcr.fit, val.type = "MSEP") 
-# shows the smallest C-V error is when M = 11 
-names(pcr.fit)
-# Report test error, and value of M selected
-pcr.pred <- predict(pcr.fit, x_test, ncomp = 11)
-mean((pcr.pred - y_test)^2)
-#68666.58
-
-# Fit PLS Model to training data, C-V
-pls.fit <- plsr(price ~ .,
-                data = train,
-                scale = TRUE,
-                validation = "CV")
-summary(pls.fit)
-validationplot(pls.fit, val.type = "MSEP")
-
-# Report test error, and value of M selected
-pls.pred <- predict(pls.fit, x_test, ncomp = 4)
-mean((pls.pred - y_test)^2)
-pls.fit <- plsr(price ~ ., data = data2, scale = TRUE, ncomp = 4)
-summary(pls.fit)
 ```
 
 ```{r, trees, include = FALSE}
 
-# Regression Tree
-tree_house <- tree(price ~ ., 
-                   data = train)
-
-summary(tree_house)
-
-plot(tree_house) 
-text(tree_house, pretty = 0, cex = 0.8)
-
-tree_house
-
-# Tree indicates that sqft_living is the most important variable
-
-cv_tree <- cv.tree(tree_house)
-plot(cv_tree$size, cv_tree$dev, type = "b")
-
-prunedtree <- prune.tree(tree_house, best = 5)
-plot(prunedtree)
-text(prunedtree, pretty = 0)
-
-# The pruned tree and the unpruned tree have the same 
-# cross validation error so we can use either to make predictions
-
-yhat <- predict(prunedtree, newdata = test)
-testdata <- test[ ,"price"]
-plot(yhat, testdata)
-abline(0, 1)
-
-mean((yhat-testdata)^2)
-sqrt(152564491806)
-
-# The sqrt of the MSE is around 390595, suggesting that this model leads to
-# test predictions that are within $390,595 of the true house price.
-
-set.seed(1)
-bag_house <- randomForest(price ~ ., 
-                          data = train,
-                          mtry = 9, 
-                          importance = TRUE)
-bag_house
-
-yhat_bag <- predict(bag_house, newdata = test)
-plot(yhat_bag, testdata)
-abline(0,1)
-
-mean((yhat_bag-testdata)^2)
-sqrt(200502311145)
-# this suggests that the model leads to test predictions that are within 
-# $447,775 of the true house price, worse than above.
-
-rf_house <- randomForest(price ~ ., 
-                         data = train,
-                         mtry = 3,
-                         importance = TRUE)
-
-yhat_rf <- predict(rf_house, newdata = test)
-
-mean((yhat_rf-testdata)^2)
-sqrt(148879274522)
-# this suggests that this model using 3 variables leads to test predictions
-# that are $385,849 within the true house price. Better than the two trees above
-
-importance(rf_house)
-varImpPlot(rf_house)
-
-# This shows that across all trees considered in the random forest, the age 
-# of a house and the sqft of the house are the two most important variables
-
-# Boosting
-boost_house <- gbm(price ~ ., 
-                   data = train,
-                   distribution = "gaussian",
-                   n.trees = 5000,
-                   interaction.depth = 4)
-
-summary(boost_house)
-
-# sqft of house is the most important variable and then sqft_lot and house age
-
-# Lets produce some partial dependence plots for sqft_living and yr_built
-# these illustrate the marginal effect of the selected variables on the response
-# after integrating out the other variables
-
-par(mfrow=c(2, 1))
-
-plot(boost_house, i = "sqft_living")
-plot(boost_house, i = "house_age")
-
-# Use boosted model to predict price on the test set
-
-yhat_boost <- predict(boost_house, 
-                      newdata = test,
-                      n.trees = 5000)
-
-mean((yhat_boost-testdata)^2)
-sqrt(218630375438)
-# worse performance than the above trees.
-
-# boosting with a different value of lambda
-boost_boston <- gbm(price ~ .,
-                    data = train,
-                    distribution = "gaussian",
-                    n.trees = 5000,
-                    interaction.depth = 4, 
-                    shrinkage = 0.2, 
-                    verbose = F)
-
-yhat_boost <- predict(boost_boston,
-                      newdata = test, 
-                      n.trees = 5000)
-
-mean((yhat_boost-testdata)^2)
-sqrt(2.33353e+11)
-# even worse!
-
-
-
 ```
 
 
 
-```{r setup, include=FALSE}
-#convert city variable from character to factor
-data$city <- as.factor(data$city)
-#obtain summary for this variable
-summary(data$city)
+```{r, include=FALSE}
 
 
 ```
-
-
-
 
 # Results:
-
-Summary of major results, graphs, diagnostic outputs
-
-Strictly relevant to the objectives
-
-Must include a link to the Github repository containing a fully reproducible and documented analysis
-Reported in scientific style.
-
 
 
 ## Conclusions:
 
-~1 paragraph
 
 
 # References
-
-3-5 peer reviewed references
--
--
--
--
--
