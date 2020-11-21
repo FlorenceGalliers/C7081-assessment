@@ -75,36 +75,251 @@ The first task was preparing and cleaning the dataset. This served two purposes,
 ```
 
 
-# Methods:
+# Methods
+House price is a continuous variable and so a supervised learning approach was chosen throughout. The dataset was split randomly into two parts, a training set containing 80% of the observations and a test set containing the remaining 20%. The training set will be used to train all of the models and the test set will be used to assess accuracy of the models. 
 
-```{r, splitting into training and test set}
-set.seed(2) 
-n = nrow(data) #number of rows
-train_index = sample(1:n, size = round(0.8*n), replace=FALSE) 
-train = data[train_index ,] #takes 80% of the data for training set
-test = data[-train_index ,] #remaining 20% for the test set
+```{r, splitting into training and test set, include = FALSE}
+set.seed(2) # set seed
+n <- nrow(data) # create variable with number of rows
+train_index <- sample(1:n, size = round(0.8*n), replace=FALSE) 
+train <- data[train_index ,] # takes 80% of the data for training set
+test <- data[-train_index ,] # remaining 20% for the test set
+```
+ 
+## Linear Regression
+To begin, a simple linear regression model was created using price as the dependent variable and square foot living area (sqft_living) as the independent variable. Sqft_living was chosen because it was shown to be the most correlated variable to house price in the exploratory data analysis. A simple linear regression model uses the *lm* function. Linear regression fits a line of best fit which minimises the difference between predicted and actual values.
+ 
+```{r, Simple lm, include = FALSE}
+# create simple linear model using price as dependent variable and sqft_living
+# as independent variable, and training data set
+simple_lm <- lm(price ~ sqft_living, 
+               data = train)
+# make predictions using this model on test data set
+simple_pred <- predict(simple_lm, 
+                       test) 
+# calculate MSE of simple linear model
+simple_lm_MSE <- mean((test[, "price"] - simple_pred)^2)
+# calculate RMSE
+simple_lm_RMSE <- sqrt(simple_lm_MSE)
+
+# print summary of model
+summary(simple_lm)
+```
+
+To see what effect other variables had on this, multiple linear regression was then carried out using all of the other variables available.
+
+```{r, Multiple lm, include = FALSE}
+# create a multiple linear model using price as dependent variable and all
+# other variables, training data set
+multiple_lm <- lm(price ~ .,
+                  data = train)
+# make predictions using this model on test data set
+multiple_pred <- predict(multiple_lm,
+                       test)
+# calculate MSE of multiple linear model
+multiple_lm_MSE <- mean((test[, "price"] - multiple_pred)^2)
+# calculate RMSE of multiple linear model
+multiple_lm_RMSE <- sqrt(multiple_lm_MSE)
+
+# print summary of model
+summary(multiple_lm)
 
 ```
 
-```{r, least squares}
+It became apparent that sqft_living variable and the multiple linear regression models yielded different RMSE values, suggesting that some of the other variables in addition to sqft_lviing must be contributing to the prediction of price. 
+ 
+## Variable Selection
+To look into this further and decide which variables were most influential on price, variable selection methods were explored. Best subset selection, forward selection and backwards selection were all tried. Best subset selection is a method that finds the best combinations of predictors that produce the best fit in terms of squared error. Forward selection is slightly different as it starts with no variables and one by one adds the variable which gives the smallest increase in squared error. Backward selection follows the same idea as forward selection but it starts with a full model, and iteratively removes variables until it leaves a one variable model with the lowest mean squared error. These methods all gave very similar results.
 
+```{r, Variable Selection, include = FALSE}
+# Fit subset selection model
+bestsub <- regsubsets(price ~ .,
+                      data = train,
+                      nvmax = 44)
 
+summary(bestsub)
+
+# Create test matrix
+test_matrix <- model.matrix(price ~ .,
+                            data = test)
+
+# Create loop for finding validation errors for a model of each size
+val_errors <- rep(NA, 44)
+for(i in 1:44) {
+  coefi <- coef(bestsub, id = i)
+  pred <- test_matrix[ ,names(coefi)]%*%coefi
+  val_errors[i] = mean((test$price - pred)^2)
+}
+
+val_errors
+which.min(val_errors)
+# shows which number of variables has the lowest validation error
+coef(bestsub, 34)
+
+# create prediction formula 
+predict.regsubsets <- function(object, newdata, id, ...){
+  form <- as.formula(object$call[[2]])
+  mat <- model.matrix(form, newdata)
+  coefi <- coef(object, id=id)
+  xvars <- names(coefi)
+  mat[, xvars]%*%coefi
+}
+
+# Choosing among models of different sizes using cross-validation
+k <- 10
+set.seed(1)
+folds <- sample(1:k, nrow(data), replace = TRUE)
+cv.errors <- matrix(NA, k, 44, dimnames = list(NULL, paste(1:44)))
+
+for(j in 1:k){
+  best.fit <- regsubsets(price ~ ., 
+                         data = data[folds!=j,],
+                         nvmax = 44)
+  for (i in 1:44) {
+    pred <- predict.regsubsets(best.fit, 
+                               data[folds==j,], 
+                               id = i)
+    cv.errors[j, i] = mean((data$price[folds==j] - pred)^2)
+  }
+}
+
+mean.cv.errors <- apply(cv.errors, 2, mean)
+mean.cv.errors
+
+plot(mean.cv.errors, type = "b")
+which.min(mean.cv.errors) #shows that min cv.error is with 15 variables
+
+# Plot graphs of RSS, adjr2, cp and BIC
+best_summary <- summary(best.fit)
+which.max(best_summary$adjr2) # 24 variables
+which.min(best_summary$cp) # 20 variables
+which.min(best_summary$bic) # 14 variables
+
+par(mfrow = c(2,2))
+
+plot(best_summary$rss, 
+     xlab="Number of Variables", 
+     ylab="RSS",
+     type = "l")
+
+plot(best_summary$adjr2,
+     xlab = "Number of Variables",
+     ylab = "Adjusted RSq",
+     type = "l")
+points(24, best_summary$adjr2[24], 
+       col="red", 
+       cex=2, 
+       pch=20)
+
+plot(best_summary$cp, 
+     xlab = "Number of Variables",
+     ylab = "Cp",
+     type = "l")
+points(20, best_summary$cp[20], # this is giving the coordinates of the point 
+       # on the graph to plot, 10 on the x axis and the 10th value of the cp on
+       # y axis
+       col = "red",
+       cex = 2,
+       pch = 20)
+
+plot(best_summary$bic, 
+     xlab = "Number of Variables",
+     ylab = "BIC",
+     type = "l")
+points(14, best_summary$bic[14],
+       col = "red",
+       cex = 2,
+       pch = 20)
+
+# Forward and Backward Stepwise Selection
+regfit.fwd <- regsubsets(price ~ ., 
+                         data = data, 
+                         nvmax = 44,
+                         method = "forward")
+
+summary(regfit.fwd)
+
+regfit.bwd <- regsubsets(price ~ ., 
+                         data = data, 
+                         nvmax = 44, 
+                         method = "backward")
+
+summary(regfit.bwd)
 ```
 
-```{r, include = FALSE}
+## Ridge Regression and LASSO
+Ridge Regression and the LASSO are both shrinkage methods. 
+ 
+Ridge Regression utilises L2 regularisation, this adds a penalty to the coefficients that is equal to the square of the coefficients.
 
+```{r, ridge regression, include = FALSE}
+# Fit a ridge regression, choose lambda by cross validation
+set.seed(1)
+# Split train and test data into x and y 
+x_train <- model.matrix(price ~ ., data = train)[,-1]
+x_test <- model.matrix(price ~ ., data = test)[,-1]
+y_train <- train$price
+y_test <- test$price
+# Finding optimal value of lambda using cross validation
+cv.ridge <- cv.glmnet(x_train, 
+                      y_train, 
+                      alpha = 0)
+# Assign it to best.lambda variable
+best.lambda <- cv.ridge$lambda.min
+best.lambda
+plot(cv.ridge) 
+# Report test error of ridge regression 
+ridge.mod <- glmnet(x_train, y_train, alpha = 0)
+ridge.pred <- predict(ridge.mod, 
+                      s = best.lambda,
+                      newx = x_test)
+ridge_MSE <- mean((ridge.pred - y_test)^2) # 39347.87
+ridge_RMSE <- sqrt(39347.87) # 198.363
 ```
 
-```{r, trees, include = FALSE}
+LASSO is another coefficient shrinkage technique in which the L0 norm is replaced with the L1 norm. This applies a penalty to the coefficients equal to the absolute value of the coefficients. In LASSO methods, lambda the tuning parameter allows some coefficients to be set equal to 0, in which case they are dropped out of the regression model. In this way it also acts as a selection method for choosing the variables with the most influence. We can change lambda to any value, but in this analysis cross-validation was used to select the best value of lambda.
+ 
+```{r, LASSO, include = FALSE}
+lasso.mod <- glmnet(x_train, 
+                    y_train, 
+                    alpha = 1)
+plot(lasso.mod, 
+     xvar='lambda')
 
+set.seed(1)
+cv.lasso <- cv.glmnet(x_train, 
+                      y_train,
+                      alpha = 1)
+plot(cv.lasso)
+best.lamb <- cv.lasso$lambda.min
+lasso.pred <- predict(lasso.mod, s = best.lamb, 
+                      newx = x_test)
+
+# Report test error and number of non zero coefficients for LASSO
+lasso_MSE <- mean((lasso.pred - y_test)^2)
+lasso_RMSE <- sqrt(38701.11)
+
+out <- glmnet(x_train, y_train, alpha = 1)
+lasso.coef <- predict(out, type = "coefficients", 
+                      s = best.lamb)
+lasso.coef
+lasso.coef[lasso.coef!=0]
 ```
+ 
+ 
+## Tree Based Methods
+Multiple tree based methods were explored in this analysis, starting with one simple decision tree, moving through randomForests, bagging and boosting.
+ 
+Using just one decision tree yielded some good results, however the RMSE was still higher than just ordinary least squares.
 
+### Random Forests 
+RandomForest is a method that combines together multiple decision trees.
 
+### Bagging
+Bagging stands for bootstrap aggregation. This method uses multiple decision trees (the ‘aggregation’ part) that are each trained with different data samples, with replacement (the ‘bootstrap’ part)
 
-```{r, include=FALSE}
-
-
-```
+### Boosting
+Boosting
 
 # Results:
 
