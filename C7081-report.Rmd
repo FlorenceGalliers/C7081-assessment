@@ -6,19 +6,22 @@ output:
   pdf_document:
     toc: true #table of contents true, default depth 3
     number_sections: true
-    df_print: kable
+    df_print: [kable]
+bibliography: ["ref.bib"]
+biblio-style: "harvard"
+link-citations: true
 ---
 ```{r, set wd / libraries / reading in data, include = FALSE}
 setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
 
-library(knitr)
-library(ggplot2)
-library(glmnet)
-library(pls)
-library(leaps)
-library(tree)
-library(randomForest)
-library(gbm)
+require(knitr)
+require(ggplot2)
+require(glmnet)
+require(pls)
+require(leaps)
+require(tree)
+require(randomForest)
+require(gbm)
 
 
 data <- read.csv(file = "original-data.csv")
@@ -26,43 +29,48 @@ data <- read.csv(file = "original-data.csv")
 
 
 # Background:
+House prices are an important part of the economy and usually reflect trends in it. They can be influenced by the physical condition of the house and by other attributes such as location [@bin2004prediction]. Prices are important for homeowners, prospective buyers and estate agents, prediction methods could help lead to more informed decisions to each of these stakeholders. @gao2019location suggest that prediction models may be useful for a few reasons, firstly in narrowing down the range of available houses for prospective buyers. People looking to put their house on the market could use prediction models to look for the optimal time to do so. Prediction accuracy is important.
 
+In most countries there is some form of house price index that measures changes in prices [@lu2017hybrid]. This contains a summary of all transactions that take place but not the individual features of each house sold, therefore it cannot be used to make predictions of house price.
+
+Something else to take into account is that it may be difficult for prospective buyers to visualise how square footage measurements of a house are calculated or how this measurement translates into physical size if they have not visited the house themselves. Buyers therefore rely on factors such as the number of bedrooms, bathrooms or house age to get an idea of the value of the house. This analysis will focus on which features of a house have the largest influence on the prediction of house prices. This report does not look at the effect of time on house prices. It is already a well known fact that house prices increase every year [@alfiyatin2017modeling]. 
+
+Many house price prediction models have been created using machine learning methods. The hedonic price model is the most extensively researched and uses regression methods [@gao2019location]. Machine learning methods use data in a ‘training set’ to build a model, this model is then used to make predictions on an unseen ‘test set’ of data. The accuracy of models can be calculated by taking the predicted values from the actual values.
 
 ## Objectives:
-
+* Understand which attributes of houses given in the data set can be used to effectively construct a prediction model for house price (dependent variable).
+* Minimize the differences between predicted and actual house prices by using model selection to choose the most accurate model.
 
 # Data:
 
+## Data Description
+The dataset chosen for this analysis is from houses sold in 2014 in Washington, USA. It contains the sale price (US dollars) along with attributes of each house such as number of bedrooms, number of bathrooms, etc. There were 4600 observations with 17 variables in the original data set downloaded from [Kaggle] (https://www.kaggle.com/shree1992/housedata).
+Although the dataset is from 2014, it was a particularly interesting data set because it contains a large amount of information and interesting selection of variables. A more recent data set, or one from the UK could not be found, and so this analysis will go ahead with this data set.
 
-## Data Preparation:
-
-
-```{r, echo = FALSE}
-
-```
-
-The remaining variables and their descriptions are shown in Table 1:
+## Data Preparation
+The first task was preparing and cleaning the dataset. This served two purposes, firstly to get to know the different variables in the data and existing patterns or correlations between them and secondly to carry out feature selection. Missing values were searched for and removed and any observations in which price equalled zero were removed. The cleaned dataset was exported ready for use in the main analysis. This cleaned data set contained 4522 observations and 12 variables (Table 1).
 
 ```{r, Table 1, echo = FALSE}
 
 #insert table 1
-data_descriptions <- c("House sale price in thousands of US dollars", 
-                       "Number of bedrooms",
-                       "Number of bathrooms",
-                       "Area of house in square feet",
-                       "Area of whole housing lot in square feet",
-                       "Number of floors in the house",
-                       "Condition of house, 1 to 5",
-                       "1 = if house has a basement, 0 = no basement",
-                       "Year that the house was built subtracted from 2014",
-                       "1 = if house has been renovated, 0 = if no renovation",
-                       "Location of house to the nearest city in Washington, USA")
+# data_descriptions <- c("House sale price in thousands of US dollars", 
+      #                 "Number of bedrooms",
+       #                "Number of bathrooms",
+        #               "Area of whole housing lot in square feet",
+         #              "Number of floors in the house",
+          #               "Area of house in square feet",
+            #           "Condition of house, 1 to 5",
+             #          "1 = if house has a basement, 0 = no basement",
+              #         "Year that the house was built subtracted from 2014",
+               #        "1 = if house has been renovated, 0 = if no renovation",
+                #       "Location of house to the nearest city in Washington, USA",
+                 #      "Zip code of house")
 
-data_dictionary <- data.frame(names(data), data_descriptions)
+# data_dictionary <- data.frame(names(data), data_descriptions)
 
-kable(data_dictionary,
-      col.names = c("Variable", "Description"),
-      caption = "Data Dictionary")
+# kable(data_dictionary,
+    #  col.names = c("Variable", "Description"),
+    #  caption = "Data Dictionary")
 
 ```
 
@@ -70,27 +78,16 @@ kable(data_dictionary,
 # Methods:
 
 ```{r, splitting into training and test set}
-
 set.seed(2) 
-n = nrow(data2) #number of rows
+n = nrow(data) #number of rows
 train_index = sample(1:n, size = round(0.8*n), replace=FALSE) 
-train = data2[train_index ,] #takes 80% of the data for training set
-test = data2[-train_index ,] #remaining 20% for the test set
+train = data[train_index ,] #takes 80% of the data for training set
+test = data[-train_index ,] #remaining 20% for the test set
 
 ```
 
 ```{r, least squares}
-lm_model <- lm(price ~ ., 
-               data = train)
-# make predictions on test set
-lm_pred <- predict(lm_model, test) 
-# calculate MSE
-mean((test[, "price"] - lm_pred)^2)
-summary(lm_model)
 
-# Diagnostic plots of the linear regression model
-par(mfrow=c(2,2))
-plot(lm_model)
 
 ```
 
