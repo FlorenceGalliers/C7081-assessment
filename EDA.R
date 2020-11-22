@@ -12,6 +12,8 @@ library(psych)
 library(ggplot2)
 library(ggcorrplot)
 library(xlsx)
+library(dummies)
+
 
 # Import original data set as downloaded from Kaggle
 # https://www.kaggle.com/shree1992/housedata
@@ -164,6 +166,16 @@ data <- data[-lowfreq_cities,] #left with 4532 observations after removing these
 #low frequency cities
 data$city <- droplevels(data$city) #drop these unused levels from dataset
 plot(data$city, data$price) #definitely looks to be some cities with higher prices
+# change factor level names so they do not inlcude spaces
+levels(data$city) <- c("Auburn", "Bellevue", "Blackdiamond", "Bothell", "Burien",
+                       "Carnation", "Clydehill", "Covington", "Desmoines",
+                       "Duvall", "Enumclaw", "Fallcity", "Federalway", 
+                       "Issaquah", "Kenmore", "Kent", "Kirkland", 
+                       "Lakeforestpark", "Maplevalley", "Medina", 
+                       "Mercerisland", "Newcastle", "Normandypark", 
+                       "Northbend", "Pacific", "Ravensdale", "Redmond", "Renton",
+                       "Sammamish", "SeaTac", "Seattle", "Shoreline", "Snoqualmie",
+                       "Tukwila", "Vashon", "Woodinville")
           
 #17 State zipcode
 summary(data$statezip)
@@ -173,11 +185,11 @@ plot(data$statezip, data$price) #definitely some here with higher values than ot
 #18 Country (not included in analysis)
 # constant variable, so lets remove
 
-variables_to_remove <- c(1, 8, 9, 11, 15, 18)
+variables_to_remove <- c(1, 8, 9, 11, 15, 17, 18)
 # Date, Waterfront, View, sqft_above, Street, Country
 data <- data[ ,-variables_to_remove]
 
-# We are left with 12 variables after the initial EDA
+# We are left with 11 variables after the initial EDA
 
 # Remove outliers identified throughout.
 outliers <- c(100, 121, 122, 2271, 2387, 2921, 4324, 4325, 4328, 4329)
@@ -229,5 +241,4 @@ ggcorrplot(cor_mat,
 # bedrooms and no of floors. These will be the variables we will focus on in
 # in our analysis.
 # The correlation between price and house_age is not significant. 
-
 
