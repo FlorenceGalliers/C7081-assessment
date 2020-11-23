@@ -20,193 +20,12 @@ require(writexl)
 require(psych)
 require(ggcorrplot)
 require(dummies)
+library(openxlsx)
 
-# Import original data set as downloaded from Kaggle
-# https://www.kaggle.com/shree1992/housedata
-data <- read.csv(file = "original-data.csv")
+# Import cleaned data set created after Exploratory Data Analysis
+data <- read.xlsx("cleaned-data.xlsx")
 
-set.seed(2)
-
-# Exploratory Data Analysis (EDA)
-# This section is intended to get to know the data, select the best variables to 
-# take forward in a cleaned data set to use in my analysis and visualise any
-# existing patterns or correlations in the data.
-
-# First I am will go through each of the variables from the original data set
-
-#1 Date (not included in analysis)
-summary(data$date)
-# This is a character variable giving the date of the sale of the house, as I will
-# not be looking at price over time, this variable is not going to be included in my
-# analysis.
-
-#2 Price (dependent variable for analysis)
-summary(data$price)
-# Numeric variable giving sale price of house in US dollars
-# We can see the max price is well above the 3rd quartile value, this may be due 
-# to some outlying values. Will look into this later.
-# best to convert this variable into thousands of dollars to make it more manageable
-data$price <- data$price/1000
-# Look if any values are = 0, assign them to variable
-zero_values <- which(data$price == 0)
-# Remove these from the data set as house price cannot be $0
-data <- data[-zero_values,]
-
-#3 Bedrooms
-summary(data$bedrooms)
-# There are between 0 and 9 bedrooms in each house, mean of just over 3 bedrooms
-hist(data$bedrooms)
-# Histogram shows normal distribution of number of bedrooms, can also see they 
-# are discrete values.
-plot(data$bedrooms) # normal distribution
-plot(data$bedrooms, data$price) # price increase with increase in bedrooms?
-
-#4 Bathrooms
-summary(data$bathrooms)
-#There are between 0 and 8 bathrooms in each house, mean of just over 2 bathrooms
-hist(data$bathrooms)
-plot(data$bathrooms, data$price) # may be positive correlation between no of 
-# bathrooms and price of house
-bathrooms <- as.factor(data$bathrooms)
-plot(bathrooms, data$price)
-
-#5 sqft_living
-summary(data$sqft_living) 
-plot(data$sqft_living, data$price)
-#can see that as sqft of living area increases, price increases
-
-#6 sqft_lot
-summary(data$sqft_lot)
-plot(data$sqft_lot, data$price)
-
-#7 Floors
-summary(data$floors) #between 1 and 3.5 floors for each house, mean of 1.5
-plot(data$floors, data$price)
-
-#8 Waterfront (not included in analysis)
-plot(data$waterfront) #not many values for this
-data$waterfront <- as.factor(data$waterfront)
-count(data$waterfront) #only 33 values as 'YES' for having a waterfront
-#lets remove this variable from our dataset
-
-#9 View (not included in analysis)
-summary(data$view)
-plot(data$view)
-data$view <- as.factor(data$view)
-count(data$view)
-#most houses score 0 for view, or the data is missing
-#lets remove this variable from our dataset.
-
-#10 Condition
-summary(data$condition) #looks like 5 levelled rating on condition
-plot(data$condition)
-#lets convert to a factor
-#data$condition <- as.factor(data$condition)
-#count(data$condition) #majority have condition 3,4,5 which is not suprising 
-plot(data$condition, data$price) #looks like price may not change too much with
-#condition
-
-#11 sqft_above (not included in analysis)
-summary(data$sqft_above)
-plot(data$sqft_above, data$price)
-#looks to be a correlation, but is this just the same as sqft_living as not 
-#all properties have basements (see below) - remove this variable
-cor(data$sqft_above, data$sqft_living) #88% correlated with sqft_living
-
-#12 sqft_basement
-summary(data$sqft_basement)
-plot(data$sqft_basement) #can see a lot of properties have 0 value for this 
-#which means they do not have a basement, lets convert this into a binary variable
-#instead, with 0 = no basement and 1 = basement
-data$sqft_basement <- ifelse(data$sqft_basement == 0, 0, 1)
-#change column name from sqft_basement to if_basement
-names(data)[names(data) =="sqft_basement"] <- "if_basement"
-data$if_basement <- as.factor(data$if_basement)
-
-#13 yr_built
-plot(data$yr_built, data$price)
-#it is treating this as a numeric continuous variable, lets change it into age
-#of house instead of year built.
-end_year <- 2014 #year data is from
-#calculate age of each house is years
-data$yr_built <- end_year - data$yr_built
-#change column name from yr_built to house_age
-names(data)[names(data)=="yr_built"] <- "house_age"
-#converted age into categorical variable with 10 year age groups
-#data$house_age <- cut(data$house_age, 
-#  breaks = c(-Inf, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, Inf),
-# labels = c("0-10", "11-20", "21-30", "31-40", "41-50",
-#           "51-60", "61-70", "71-80", "81-90", "91-100", "100+"))
-#levels(data$house_age)
-#count(data$house_age)
-plot(data$house_age, data$price) #doesn't look like age has too much of an effect
-#on price
-
-#14 yr_renovated
-count(data$yr_renovated) #we can see there are 2706 zero values which means not
-#all properties have been renovated. lets change into a binary variable where 
-# 0 = no renovation and 1 = has been renovated
-data$yr_renovated <- ifelse(data$yr_renovated == 0, 0, 1)
-# change column name from yr_renovated to if_renovated
-names(data)[names(data) =="yr_renovated"] <- "if_renovated"
-count(data$if_renovated) 
-boxplot(data$if_renovated, data$price)
-data$if_renovated <- as.factor(data$if_renovated)
-
-#15 Street (not included in analysis)
-summary(data$street) #character variable giving street name
-data$street <- as.factor(data$street) #all unique names - not going to be much
-#help in predicting price so lets remove this from the dataset
-
-#16 City
-summary(data$city) #character variable giving city that houses are located in
-data$city <- as.factor(data$city)
-count(data$city) #gives factor with 44 levels, some only have one or two houses in
-#lets remove observations for those cities with less than 5 houses.
-lowfreq_cities <- c(which(data$city == "Algona"),
-                    which(data$city == "Beaux Arts Village"),
-                    which(data$city == "Inglewood-Finn Hill"),
-                    which(data$city == "Milton"),
-                    which(data$city == "Preston"),
-                    which(data$city == "Skykomish"),
-                    which(data$city == "Snoqualmie Pass"),
-                    which(data$city == "Yarrow Point"))
-data <- data[-lowfreq_cities,] #left with 4532 observations after removing these
-#low frequency cities
-data$city <- droplevels(data$city) #drop these unused levels from dataset
-plot(data$city, data$price) #definitely looks to be some cities with higher prices
-# change factor level names so they do not inlcude spaces
-levels(data$city) <- c("Auburn", "Bellevue", "Blackdiamond", "Bothell", "Burien",
-                       "Carnation", "Clydehill", "Covington", "Desmoines",
-                       "Duvall", "Enumclaw", "Fallcity", "Federalway", 
-                       "Issaquah", "Kenmore", "Kent", "Kirkland", 
-                       "Lakeforestpark", "Maplevalley", "Medina", 
-                       "Mercerisland", "Newcastle", "Normandypark", 
-                       "Northbend", "Pacific", "Ravensdale", "Redmond", "Renton",
-                       "Sammamish", "SeaTac", "Seattle", "Shoreline", "Snoqualmie",
-                       "Tukwila", "Vashon", "Woodinville")
-
-#17 State zipcode
-summary(data$statezip)
-data$statezip <- as.factor(data$statezip) #73 unique variables? is this too many?
-plot(data$statezip, data$price) #definitely some here with higher values than others
-
-#18 Country (not included in analysis)
-# constant variable, so lets remove
-
-variables_to_remove <- c(1, 8, 9, 11, 15, 17, 18)
-# Date, Waterfront, View, sqft_above, Street, Country
-data <- data[ ,-variables_to_remove]
-
-# We are left with 11 variables after the initial EDA
-
-# Remove outliers identified throughout.
-outliers <- c(100, 121, 122, 2271, 2387, 2921, 4324, 4325, 4328, 4329)
-data <- data[-outliers, ]
-
-# Final number of observations is 4522
-
-set.seed(2) # set seed
+set.seed(22) # set seed
 n <- nrow(data) # create variable with number of rows
 train_index <- sample(1:n, size = round(0.8*n), replace=FALSE) 
 train <- data[train_index ,] # takes 80% of the data for training set
@@ -257,17 +76,15 @@ vif(multiple_lm)
 # Fit subset selection model
 bestsub <- regsubsets(price ~ .,
                       data = train,
-                      nvmax = 44)
-
-summary(bestsub)
+                      nvmax = 25)
 
 # Create test matrix
 test_matrix <- model.matrix(price ~ .,
                             data = test)
 
 # Create loop for finding validation errors for a model of each size
-val_errors <- rep(NA, 44)
-for(i in 1:44) {
+val_errors <- rep(NA, 25)
+for(i in 1:25) {
   coefi <- coef(bestsub, id = i)
   pred <- test_matrix[ ,names(coefi)]%*%coefi
   val_errors[i] = mean((test$price - pred)^2)
@@ -275,8 +92,9 @@ for(i in 1:44) {
 
 val_errors
 which.min(val_errors)
+plot(val_errors)
 # shows which number of variables has the lowest validation error
-coef(bestsub, 34) # 34 variables is optimal from validation error
+coef(bestsub, 23) # 23 variables is optimal from validation error
 
 # create prediction formula 
 predict.regsubsets <- function(object, newdata, id, ...){
@@ -290,13 +108,13 @@ predict.regsubsets <- function(object, newdata, id, ...){
 # Choosing among models of different sizes using cross-validation
 k <- 5
 folds <- sample(1:k, nrow(data), replace = TRUE)
-cv.errors <- matrix(NA, k, 44, dimnames = list(NULL, paste(1:44)))
+cv.errors <- matrix(NA, k, 25, dimnames = list(NULL, paste(1:25)))
 
 for(j in 1:k){
   best.fit <- regsubsets(price ~ ., 
                          data = data[folds!=j,],
-                         nvmax = 44)
-  for (i in 1:44) {
+                         nvmax = 25)
+  for (i in 1:25) {
     pred <- predict.regsubsets(best.fit, 
                                data[folds==j,], 
                                id = i)
@@ -308,20 +126,19 @@ mean.cv.errors <- apply(cv.errors, 2, mean)
 mean.cv.errors
 
 plot(mean.cv.errors, type = "b")
-which.min(mean.cv.errors) #shows that min cv.error is with 16 variables
+which.min(mean.cv.errors) #shows that min cv.error is with 19 variables
 
-mean.cv.errors[16]
+mean.cv.errors[19]
 
-summary(best.fit)
-
-# Create new test and train data sets containing only the best 15 variables as 
+# Create new test and train data sets containing only the best 19 variables as 
 # selected by best subset selection
-names(dummy_test)
-best_train <- dummy_train[c(1, 2, 3, 4, 7, 9, 10, 14, 19, 
-                            26, 28, 29, 32, 33, 39, 41, 43)]
+bestsub_summary <- summary(bestsub)
+which_bestsub <- bestsub_summary$which
+variables_bestsub <- which_bestsub[19,]
+best_variables <- which(variables_bestsub == TRUE)
 
-best_test <- dummy_test[c(1, 2, 3, 4, 7, 9, 10, 14, 18, 
-                          25, 27, 28, 31, 32, 37, 39, 41)]
+best_train <- dummy_train[ ,best_variables]
+best_test <- dummy_test[, best_variables]
 
 # Run linear model using only the best 15 variables selected from best subset selection
 final_bestsub <- lm(price ~ .,
@@ -340,35 +157,37 @@ final_bestsub_RMSE <- sqrt(final_bestsub_MSE)
 
 
 # Forward Stepwise Selection
-regfit.fwd <- regsubsets(price ~ ., 
+forward_model <- regsubsets(price ~ ., 
                          data = data, 
-                         nvmax = 44,
+                         nvmax = 25,
                          method = "forward")
 
-summary(regfit.fwd)
+summary(forward_model)
 
 # Create loop for finding validation errors for a model of each size in forward selection
-fwd_errors <- rep(NA, 44)
-for(i in 1:44) {
-  coefi <- coef(regfit.fwd, id = i)
+fwd_errors <- rep(NA, 25)
+for(i in 1:25) {
+  coefi <- coef(forward_model, id = i)
   pred <- test_matrix[ ,names(coefi)]%*%coefi
   fwd_errors[i] = mean((test$price - pred)^2)
 }
 
 fwd_errors
-which.min(fwd_errors) # it says minimum is 44, but there seems to be some overfitting
-# after around 20 variables, a low point at 16.
+which.min(fwd_errors) # it says minimum is 24, but there seems to be some overfitting
+# after around 20 variables, a low point at 15.
 
 plot(fwd_errors)
 # 16 variable model also has a low validation error
 
 # Create new test and train data sets containing only the best 16 variables as 
 # selected by forward selection
-forward_train <- dummy_train[c(1, 2, 3, 4, 7, 9, 10, 14, 19, 
-                               25, 26, 29, 32, 33, 39, 41, 43)]
+forward_summary <- summary(forward_model)
+which_forward <- forward_summary$which
+variables_fwd <- which_forward[24,]
+fwd_variables <- which(variables_fwd == TRUE)
 
-forward_test <- dummy_test[c(1, 2, 3, 4, 7, 9, 10, 14, 18, 
-                             24, 25, 28, 31, 32, 37, 39, 41)]
+forward_train <- dummy_train[ ,fwd_variables]
+forward_test <- dummy_test[, fwd_variables]
 
 # Run linear model using 15 variables from forward selection
 forward_model <- lm(price ~ .,
@@ -384,35 +203,35 @@ forward_MSE <- mean((forward_test[, "price"] - forward_pred)^2)
 forward_RMSE <- sqrt(forward_MSE)
 
 # Backward Stepwise Selection
-regfit.bwd <- regsubsets(price ~ ., 
+backward_model <- regsubsets(price ~ ., 
                          data = data, 
-                         nvmax = 44, 
+                         nvmax = 25, 
                          method = "backward")
 
-summary(regfit.bwd)
+summary(backward_model)
 
 # Create loop for finding validation errors for a model of each size in backward selection
-bwd_errors <- rep(NA, 44)
-for(i in 1:44) {
-  coefi <- coef(regfit.bwd, id = i)
+bwd_errors <- rep(NA, 25)
+for(i in 1:25) {
+  coefi <- coef(backward_model, id = i)
   pred <- test_matrix[ ,names(coefi)]%*%coefi
   bwd_errors[i] = mean((test$price - pred)^2)
 }
 
 bwd_errors
-which.min(bwd_errors) # it says minimum is 43, but there seems to be some overfitting
-# after around 20 variables, a low point at 15 shown on plot.
+which.min(bwd_errors) # minimum is 22
 
 plot(bwd_errors)
-# 15 variable model also has a low validation error
 
 # Create new test and train data sets containing only the best 15 variables as 
 # selected by forward selection
-backward_train <- dummy_train[c(1, 2, 3, 4, 7, 9, 10, 14, 19, 
-                                26, 29, 32, 33, 39, 41, 43)]
+backward_summary <- summary(backward_model)
+which_backward <- backward_summary$which
+variables_bwd <- which_backward[22,]
+bwd_variables <- which(variables_bwd == TRUE)
 
-backward_test <- dummy_test[c(1, 2, 3, 4, 7, 9, 10, 14, 18, 
-                              25, 28, 31, 32, 33, 37, 39, 41)]
+backward_train <- dummy_train[ ,bwd_variables]
+backward_test <- dummy_test[, bwd_variables]
 
 # Run linear model using 15 variables from backward selection
 backward_model <- lm(price ~ .,
@@ -485,9 +304,7 @@ out <- glmnet(x_train, y_train, alpha = 1)
 lasso_coef <- predict(out, type = "coefficients", 
                       s = best_lamb)
 lasso_coef
-lasso_variables <- lasso_coef[lasso_coef!=0]
-# This gives 45 variables in the best model ... a lot more variables than selected 
-# by other methods.
+# This drops 6 variables to have coefficients == 0, so leaves a 35 variable model
 
 # Plot shows percentage of deviance explained
 plot(lasso_mod, xvar="dev", label=TRUE)
@@ -614,7 +431,7 @@ boost_house$shrinkage #lambda for boost_house is 0.1
 
 summary(boost_house)
 # From this summary it is clear the variable that accounts for the highest amount 
-# of variance is sqft_living, followed by no of bathrooms and house_age.]
+# of variance is sqft_living, followed by no of bathrooms.
 # The rest of the variables account for a tiny amount of variance in comparison.
 
 # Lets produce some partial dependence plots for sqft_living and no of bathrooms
@@ -663,6 +480,21 @@ RMSE_comparison <- c(simple_lm_RMSE,
                      rf_m3_30_RMSE,
                      boost_RMSE,
                      boost2_RMSE)
+
+RMSE_names <- c("simple_lm_RMSE",
+                "multiple_lm_RMSE",
+                "final_bestsub_RMSE",
+                "backward_RMSE", 
+                "forward_RMSE",
+                "lasso_RMSE",
+                "ridge_RMSE",
+                "tree_RMSE",
+                "rf_RMSE",
+                "rf_100_RMSE",
+                "rf_m3_RMSE",
+                "rf_m3_30_RMSE",
+                "boost_RMSE",
+                "boost2_RMSE")
 
 plot(RMSE_comparison)
 
