@@ -7,19 +7,19 @@ This repository is part of my C7081 Assignment. It contains the following files:
 
 This is the original data, as downloaded from Kaggle (https://www.kaggle.com/shree1992/housedata), this was used for the EDA and produced the below cleaned dataset.
 
-2. analysis-data.???
+2. cleaned-data.xlsx
 
-This is the cleaned dataset that I used for my anaysis.
+This is the cleaned dataset that was used for my analysis tasks.
 
 **Scripts**
 
-3. EDA.R
+3. C7081-EDA.R
 
-Exploratory Data Analysis R script.
+Exploratory Data Analysis R script, including run through of each of the original variables, data cleaning, production of clean data set for analysis and correlation exploration.
 
-4. analysis.R
+4. C7081-Methods.R
 
-Analysis R script
+Analysis R script with reproducible methods for all approaches considered in this analysis.
 
 5. C7081-report.Rmd
 
