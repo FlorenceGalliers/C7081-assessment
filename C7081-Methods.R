@@ -140,7 +140,13 @@ for(i in 1:25) {
   val_errors[i] = mean((test$price - pred)^2)}
 val_errors # print validation errors
 which.min(val_errors) # print the minimum validation error
-plot(val_errors) # plot validation errors 
+plot(val_errors, type = "b",
+     main = "Best-Subset Selection Validation Errors",
+     xlab = "Model Size (number of variables included)",
+     ylab = "Validation Error",
+     cex.axis = 0.8)
+
+# plot validation errors 
 # shows which number of variables has the lowest validation error
 coef(bestsub, 23) # 23 variables is optimal from validation error
 
@@ -171,8 +177,11 @@ for(j in 1:k){
 
 mean.cv.errors <- apply(cv.errors, 2, mean) # average cv errors into table
 mean.cv.errors # get the mean cv error for models of each size
-
-plot(mean.cv.errors, type = "b")
+plot(mean.cv.errors, type = "b",
+     main = "Mean Cross Validation Error for Best-Subset Selection",
+     xlab = "Model Size (number of variables)",
+     ylab = "Mean Cross Validation Error",
+     cex.axis = 0.8)
 which.min(mean.cv.errors) #shows that min cv.error is with 19 variables
 
 mean.cv.errors[19] # get mean cv error for 19 variable model
@@ -223,7 +232,11 @@ fwd_errors
 which.min(fwd_errors) # it says minimum is 24, but there seems to be some overfitting
 # after around 20 variables, a low point at 15.
 
-plot(fwd_errors)
+plot(fwd_errors, type = "b",
+     main = "Forward Selection Validation Errors",
+     xlab = "Model Size (number of variables included)",
+     ylab = "Validation Error",
+     cex.axis = 0.8)
 # 16 variable model also has a low validation error
 
 # Create new test and train data sets containing only the best 16 variables as 
@@ -268,7 +281,11 @@ for(i in 1:25) {
 bwd_errors
 which.min(bwd_errors) # minimum is 22
 
-plot(bwd_errors)
+plot(bwd_errors, type = "b",
+     main = "Backward Selection Validation Errors",
+     xlab = "Model Size (number of variables included)",
+     ylab = "Validation Error",
+     cex.axis = 0.8)
 
 # Create new test and train data sets containing only the best 15 variables as 
 # selected by forward selection
@@ -552,6 +569,7 @@ boost2_RMSE <- sqrt(boost2_MSE)
 # 12.0 Results ####
 RMSE_comparison <- c(simple_lm_RMSE,
                      multiple_lm_RMSE,
+                     multiple_select_RMSE,
                      final_bestsub_RMSE,
                      backward_RMSE, 
                      forward_RMSE,
@@ -565,31 +583,33 @@ RMSE_comparison <- c(simple_lm_RMSE,
                      boost_RMSE,
                      boost2_RMSE)
 
-RMSE_names <- c("simple_lm_RMSE",
-                "multiple_lm_RMSE",
-                "final_bestsub_RMSE",
-                "backward_RMSE", 
-                "forward_RMSE",
-                "lasso_RMSE",
-                "ridge_RMSE",
-                "tree_RMSE",
-                "rf_RMSE",
-                "rf_100_RMSE",
-                "rf_m3_RMSE",
-                "rf_m3_30_RMSE",
-                "boost_RMSE",
-                "boost2_RMSE")
+RMSE_comparison <- t(RMSE_comparison)
 
-plot(RMSE_comparison)
+RMSE_names <- c("Simple Linear Model",
+                "Multiple Linear Model with all availanle predictors",
+                "Mutiple Linear Model with only 15 predictors",
+                "Linear Model, variables selected by best-subset selection",
+                "Linear Model, variables selected by backward stepwise selection", 
+                "Linear Model, variables selected by forward stepwise selection",
+                "LASSO Regression Model",
+                "Ridge Regression Model",
+                "Basic Decision Tree",
+                "Bagging Model of randomForest, m = p",
+                "Bagging Model, reduced to 100 trees",
+                "randomForest, m = 3",
+                "randomForest, m = 30, reduced to 30 trees",
+                "Boosting with lambda = 0.1",
+                "Boosting with lambda = 0.001")
 
-RMSE_lowest <- c( multiple_lm_RMSE,
-                  final_bestsub_RMSE,
-                  backward_RMSE, 
-                  forward_RMSE,
-                  lasso_RMSE,
-                  ridge_RMSE)
+results_table <- cbind(RMSE_names, RMSE_comparison)
 
-plot(RMSE_lowest)
+write.xlsx(results_table, "results.xlsx")
+
+barplot(RMSE_comparison, 
+        main = "Comparison of RMSE across models",
+        xlab = RMSE_names)
+
+ggplot(data = RMSE_comparison)
 
 # 13.0 Trialling Linear Regression without Location variables ####
 new_train <- train[, -11]

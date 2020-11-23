@@ -12,8 +12,26 @@ biblio-style: "harvard"
 link-citations: true
 ---
 
+```{r, Import Data, Libraries, Set Up, include = FALSE}
+
+require(openxlsx)
+require(knitr)
+require(kableExtra)
+require(psych)
+require(ggplot2)
+require(ggcorrplot)
+require(RColorBrewer)
+
+setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
+data <- read.xlsx("cleaned-data.xlsx")
+data$if_basement <- as.factor(data$if_basement)
+data$if_renovated <- as.factor(data$if_renovated)
+data$city <- as.factor(data$city)
+```
+
+\newpage 
 # Background:
-House prices are an important part of the economy and usually reflect trends in it. They can be influenced by the physical condition of the house and by other attributes such as location [@bin2004prediction]. Prices are important for homeowners, prospective buyers and estate agents, prediction methods could help lead to more informed decisions to each of these stakeholders. @gao2019location suggest that prediction models may be useful for narrowing down the range of available houses for prospective buyers and allowing sellers to predict optimal times to list thier houses on the market. Prediction accuracy is important in all of these situations.
+House prices are an important part of the economy and usually reflect trends in it. They can be influenced by the physical condition of the house and by other attributes such as location [@bin2004prediction]. Prices are important for homeowners, prospective buyers and estate agents, prediction methods could help lead to more informed decisions to each of these stakeholders. @gao2019location suggest that prediction models may be useful for narrowing down the range of available houses for prospective buyers and allowing sellers to predict optimal times to list their houses on the market. Prediction accuracy would be important in all of these situations as inaccurate models would not be trusted by their users.
 
 In most countries there is some form of house price index that measures changes in prices [@lu2017hybrid]. This contains a summary of all transactions that take place but not the individual features of each house sold, therefore it cannot be used to make predictions of house price.
 
@@ -32,85 +50,174 @@ The dataset chosen for this analysis is from houses sold in 2014 in Washington, 
 Although the dataset is from 2014, it was a particularly interesting data set because it contains a large amount of information and an interesting selection of variables. A more recent data set, or one from the UK could not be found, and so this analysis will go ahead with this data set.
 
 ## Data Preparation and Exploration
-The first task was preparing and cleaning the dataset. This served two purposes, firstly to get to know the different variables in the data and existing patterns or correlations between them and secondly to carry out feature selection. Missing values were searched for and removed and any observations in which price equalled zero were removed. The cleaned dataset was exported ready for use in the main analysis. This cleaned data set contained 4522 observations and 11 variables (Table 1).
+The first task was preparing and cleaning the dataset. This served two purposes, firstly to get to know the different variables in the data and existing patterns or correlations between them and secondly to carry out feature selection. Missing values were searched for and removed and any observations in which price was equal to zero were removed. The cleaned dataset was exported ready for use in the main analysis. This cleaned data set contained 4492 observations and 11 variables (Table 1). Some alterations were made to existing variables, these are listed in the descriptions of table 1 alongside the variable.
+
+**Table 1**: Description of all variables present in the cleaned dataset and explanations of how they were calculated if 
+they have been altered from the original dataset
 ```{r, Table 1, echo = FALSE}
+data_descriptions <- c("House sale price in thousands of US dollars, the original data was divided by 1000 to give this value", 
+                       "Numeric variable, number of bedrooms",
+                       "Numeric variable, number of bathrooms",
+                       "Numeric variable, area of house in square feet",
+                       "Numeric variable, area of whole housing lot in square feet",
+                       "Numeric variable, number of floors in the house",
+                       "Numeric variable, condition of house from 1 to 5",
+                       "Binary variable, 1 = if house has a basement, 0 = if house has no basement, this was originally showing the size of the basement, but not all houses had basements so it was changed into a binary variable",
+                       "House Age in years, calculated by 2014 minus the year the house was built",
+                       "Binary variables showing 1 = if house has been renovated, 0 = if no renovation, again this was originally showing the year of renovation however not all houses had been renovated and so it was changed to binary",
+                       "Factor variable (32 levels) giving location of house to the nearest city in Washington, USA, any city that had less than 10 houses in it was removed")
+
+data_dictionary <- data.frame(names(data), data_descriptions)
+table1_headers = c("Variable", "Description of Variable")
+
+kable(data_dictionary, col.names = table1_headers) %>%
+column_spec(1, bold = T, border_left = T) %>%
+column_spec(2, width = "12cm", border_right = T)
+
 
 ```
-
 
 ## Data Visualisation
-The cleaned data set was explored to look for any correlations between variables. The dependent variable (price) had a positive correlation with sqft_living, number of bathrooms and number of bedrooms. The strongest relationship seen was between sqft_living and number of bathrooms. It is interesting to note that the only non significant correlation involving price is between price and house age.
+The cleaned data set was explored to look for any correlations between variables (Figure 1). The dependent variable (price) had a positive correlation with sqft_living, number of bathrooms and number of bedrooms. The strongest relationship seen was between sqft_living and number of bathrooms. It is interesting to note that the only non significant correlation involving price is between price and house age. 
 
-```{r, Correlation Plot, echo = FALSE}
- 
+**Figure 1**: A correlation map showing the correlations between variables (excluding city, if_basement and if_renovated), the colours represent strength of correlation, the crosses show where the correlation is not significant.
+
+```{r, Correlation Plot, echo = FALSE, out.width = "60%"}
+Price <- data$price
+Bedrooms <- data$bedrooms
+Bathrooms <- data$bathrooms
+Size <- data$sqft_living
+Lot_Size <- data$sqft_lot
+Floors <- data$floors
+Condition <- data$condition
+Age <- data$house_age
+
+
+corr_variables <- data.frame(Price, Bedrooms, Bathrooms, Size, 
+                             Lot_Size, Floors, Condition, Age)
+cor_mat <- cor(corr_variables)
+p_mat <- cor_pmat(corr_variables)
+ggcorrplot(cor_mat, 
+           method = "square", 
+           type = "lower",
+           p.mat = p_mat,
+           lab = T, lab_size = 2.5,
+           title = "Correlation between numeric variables")
 ```
 
-
-# Analysis Methods
-House price is a continuous variable and so a supervised learning approach was chosen throughout. In a supervised learning approach there is a response variable, in this case house price, and then a number of predictor variables. All the approaches tried were regression methods in which house price was a quantitative variable. 
+# Methods
+A supervised learning approach was chosen throughout this analysis. In a supervised learning approach there is a continuous response variable, in this case house price, and a number of predictor variables. In all the approaches tried house price was a quantitative variable. 
 
 The dataset was split randomly into two parts, a training set containing 80% of the observations and a test set containing the remaining 20%. The training set was used to train all of the models and the test set to assess accuracy of the models. 
  
 ## Linear Regression
-To begin, a simple linear regression model was created using price as the dependent variable (y) and square foot living area (sqft_living) as the independent variable (x). Sqft_living was chosen because it was shown to be the most correlated variable to house price in the exploratory data analysis. 
-A simple linear regression model uses the *lm()* function. Linear regression takes a model with equation
+Firstly, a simple linear regression model was created using price as the dependent variable (y) and square foot living area (sqft_living) as the independent variable (x). Sqft_living was chosen because it was shown to be the most correlated variable to house price in the exploratory data analysis. 
+A simple linear regression model uses the *lm()* function. This linear regression takes a model with equation
 
-y = B0 + B1x + E
+price = B0 + B1(sqft_living) + E
 
-and estimates coefficients which produce a line of best fit, minimising the difference between predicted and actual values. This type of simple linear regression is known as ordinary least squares.
+and estimates coefficients which produce a line of best fit, minimising the difference between predicted and actual values. This type of simple linear regression is known as ordinary least squares. In the equation above, B0 is the intercept, B1 is the coefficient produced by the model and E is the error term.
 
-This simple model was then expanded to allow all the other variables in the dataset, this is multiple linear regression. The model output showed that 17 of these variables had a significant impact (P<0.5) on the price, they were: bedrooms, bathrooms, sqft_living, condition, if_basement.1, house_age, city.Bellevue, city.Issaquah, city.Kent, city.Kirkland, city.Medina, city.Mercerisland, city.Redmond, city.Sammamish, city.Seattle, city.Shoreline, city.Woodinville.
+This simple model was then expanded to allow all the other variables in the dataset to act as predictor variables, this is multiple linear regression. The model output showed that 17 of these variables had a significant impact (P<0.5) on the price. The coefficients of each of these variables are shown below.
 
-It should be noted that *if_basement*, *if_renovated* and *city* were all factor variables, and so when they were fit into a model, they were converted into dummy variables, with one for each factor level. This is why some of the variables selected above are not the same as those variables shown in the cleaned data set. This also raises the idea that location has a large influence on house price as 10 of the most influential variables shown above are all dummy variables originating from *city*.
+**Table 2**: Names and Coefficient estimates of variables that were significant in the multiple linear regression involving all predictor variables.
+```{r, Coefficients of Multiple Linear Model, echo = FALSE}
+set.seed(22) # set seed
+n <- nrow(data) # create variable with number of rows
+train_index <- sample(1:n, size = round(0.8*n), replace=FALSE) 
+train <- data[train_index ,] # takes 80% of the data for training set
+test <- data[-train_index ,] # remaining 20% for the test set
+multiple_lm <- lm(price ~ bedrooms+bathrooms+sqft_living+sqft_lot+floors+condition
+                  +if_basement+house_age+if_renovated+city,
+                  data = train)
+multi_coefs <- coef(multiple_lm)
+signif_probs <- data.frame(summary(multiple_lm)$coef[summary(multiple_lm)$coef[,4] <= .05, 4])
+signif_coefs <- data.frame(summary(multiple_lm)$coef[summary(multiple_lm)$coef[,4] <= .05, 1])
+
+table2_info <- cbind(signif_coefs, signif_probs)
+
+table2_headers <- c("Coef Estimates", "P-Value")
+kable(table2_info, col.names = table2_headers)%>%
+  column_spec(1, border_left = T) %>%
+  column_spec(3, border_right = T)
+```
+
+It should be noted that *if_basement*, *if_renovated* and *city* were all factor variables, and so when they were fit into a model, they were converted into dummy variables, with one for each factor level. This is why some of the variables selected above are not the same as those variables shown in the cleaned data set. This also raises the idea that location has a large influence on house price as 11 of the variables shown above are all dummy variables originating from *city*.
 
 Multicollinearity was also explored from the multiple linear model. The variance inflation factors (VIF) for each variable was calculated which shows how much of the variance of the regression coefficient is inflated due to any multicollinearity in the model. None of the VIF were above 5, with the highest being *bathrooms* at 3.3, and so there was no problematic collinearity indicated. This was carried out using the *vif()* function in the *car* package.
+
+Polynomial models of regression were trialed but they did not improve RMSE results, so this approach was not looked into further. The relationship between sqft_living and price looked to be linear in the exploratory data analysis so this was not a surprising development.
  
 ## Variable Selection Methods
-To look further into which variables were most influential on price, variable selection methods were explored. Best subset selection is a method that finds the best combinations of predictors that produce the best fit in terms of squared error. Forward selection is slightly different as it starts with no variables and one by one adds the variable which gives the smallest increase in squared error. Backward selection follows the same idea as forward selection but it starts with a full model, and iteratively removes variables until it leaves a one variable model with the lowest mean squared error. 
+To look further into which variables were most influential on price, variable selection methods were explored. Best subset selection is a method that finds the best combinations of predictors that produce the best fit in terms of squared error. Forward stepwise selection is slightly different as it starts with no variables and one by one adds the variable which gives the smallest increase in squared error. Backward stepwise selection follows the same idea as forward selection but it starts with a full model, and iteratively removes variables until it leaves a one variable model with the lowest mean squared error. 
 
 In best subset selection, cross-validation was used to choose among variables of differing sizes. This is a direct method of estimating test error. A model with 15 variables had the lowest cross-validation error. These variables were extracted and a linear model created containing only them. This linear model had a lower MSE than the simple linear model with just one variable, but was higher, therefore less accurate than the multiple linear model created with just
 
 If we had used R2 statistics to assess the models, we would always end up with a model containing all of the variables as the 'best' one. In this analysis direct methods of test error estimation were used, however as an alternative, adjusted R2, CP or BIC criterion may have been used to indirectly estimate the test error. Validation set approach was also take to estimate test error, this gave a model with many more variables and so it was decided that cross-validation was the most appropriate method to use to help narrow down the variables to the most influential.
 
-Forward and backward selection yielded almost identical results to each other with only a one variable difference to best-subset selection. The variables selected from best-subset selection were also very similar to the ones that showed a significant effect in the multiple linear model, with only one variable different. Forward and backward subset selection methods gave lower MSE results than best-subset selection.
+The validation error at different model sizes for the three kinds of variable selection are shown in Figure 2, this also includes the cross-validation error for best-subset selection. Forward and backward selection yielded almost identical results to each other with only a one variable difference to best-subset selection. The specific variables selected from best-subset selection were also very similar to the ones that showed a significant effect in the multiple linear model, with only one variable different. Forward and backward subset selection methods gave lower MSE results than best-subset selection. Figure 2 shows that all of these methods produce extremely similar results.
 
-Polynomial models of regression were trialed but they did not improve RMSE results, so this approach was not looked into further. The relationship between sqft_living and price looked to be linear in the exploratory data analysis so this was not a surprising development.
+\newpage
+
+**Figure 2**: The Validation and Cross Validation Error plots for best-subset, forward and backward selection.
+![Validation Plots](/Users/florentinagalliers/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment/validation-error-plot.png)
+
 
 ## Ridge Regression and LASSO
 Ridge Regression and the LASSO are both shrinkage methods. In the above variable selection methods, only a subset of predictors are used. In shrinkage methods all of the predictors are included in the model but the coefficient estimates are constrained towards zero, this can help to reduce variance.
  
 Ridge Regression utilises L2 regularisation, this adds a penalty to the coefficients that is equal to the square of the coefficients. Lambda is a tuning parameter, as its magnitude increases, the shrinkage penalty has more of an impact and the coefficient estimates will be closer to zero. Selecting the right value of lambda is very important, in this analysis it was selected using cross-validation. If lambda = 0, this method would be identical to ordinary least squares. Ridge regression does however always include all of the variables in the data set, this can lead to problems with interpretation.
 
-LASSO is another coefficient shrinkage technique in which the L0 norm is replaced with the L1 norm. This applies a penalty to the coefficients equal to the absolute value of the coefficients. In the LASSO method, lambda allows some coefficients to be set equal to 0, in which case they are dropped out of the regression model. In this way it  acts as a selection method for choosing the variables with the most influence. This decreases the variance of the model but increases the bias. We can change lambda to any value, but in this analysis cross-validation was used to select the best value of lambda. This method suggest a model containing 45 variables led to the lowest RMSE, this is all of the variables, so we might as well use multiple linear regression.
+LASSO is another coefficient shrinkage technique in which the L0 norm is replaced with the L1 norm. LASSO stands for Least Absolute Shrinkage and Selection Operator. The L1 norm applies a penalty to the coefficients equal to the absolute value of the coefficients. In this method, lambda allows some coefficients to be set equal to 0, in which case they are dropped out of the regression model. In this way it acts as a selection method for choosing the variables with the most influence. This decreases the variance of the model but increases the bias. We can change lambda to any value, but in this analysis cross-validation was used to select the best value of lambda. This method suggested a model containing 34 variables led to the lowest RMSE. A model was also created using an alternative value of lambda. This alternative model only contained 15 variables and is therefore more easily interpretable, the RMSE was only increased slightly but was still lower than any of the other models in this analysis.
  
 ## Tree Based Methods
-A few different tree based methods were explored in this analysis, starting with one simple decision tree, moving through bagging, randomForests and boosting. Tree based methods have the benefit of being easy to interpret but can sometimes over-simplify things.
-
-Tree methods have a limit on the number of variables, so the reduced data set from forward selection was used throughout the tree methods.
+A few different tree based methods were explored in this analysis, starting with one simple decision tree, moving through bagging, randomForests and boosting. Tree based methods have the benefit of being easy to interpret but can sometimes over-simplify things. Trees are grown using branches which split due to conditions, eventually reaching an end node that gives the outcome, in this case the outcome is House Price. Tree methods have a limit on the number of variables, so the reduced data set from forward selection was used throughout the tree methods.
  
-Using just one decision tree gave a MSE higher than using just ordinary least squares, the pruned tree with the lowest cross validation error had the same number of branches as the original decision tree.
+Using just one decision tree gave a MSE higher than using just ordinary least squares, the pruned tree with the lowest cross validation error had the same number of branches as the original decision tree. This simple decision tree only used one variable - sqft_living, suggesting this has largest effect on house price.
 
 ### Random Forests and Bagging
-RandomForest is a method that combines together multiple decision trees, this can help to improve prediction accuracy. Bagging is a type of randomForest, also known as Bootsrap Aggregation, in which the number of predictors that is considered at each split of the tree is equal to the total number of predictors in the data set.
-
-Random Forests only considers a subset of the predictors, usually sqrt(p) which in this case was around 3, at each split. This reduces variance and can lead to improved models. 
+RandomForest is a method that combines together multiple decision trees, this can help to improve prediction accuracy. Bagging is a type of randomForest, also known as Bootsrap Aggregation, in which the number of predictors (m) that is considered at each split of the tree is equal to the total number of predictors (p) in the data set. Random Forests only considers a subset of the predictors, usually sqrt(p) which in this case was around 3, at each split. Lowering the number of predictors considered at each split of the tree reduces variance and in this analysis led to a much improved model compared to randomForest where m = p.
 
 ### Boosting
-
 Boosting is another tree based method in which trees are grown sequentially, with each tree 'learning' from the last. It learns more slowly than other approaches and can reduce overfitting. Two different variations of a boosted model were created, with different values of lambda, the tuning parameter, and although reducing lambda improved MSE, it was not competitive with the multiple linear regression.
+
+The tree based methods, although more easily interpretable, produced some high RMSE results. The best of these models were the randomForests with *mtry=3* and a smaller number of trees, the RMSE of these was similar to the simple linear model containing only one variable.
 
 # Results:
 Link to [Github](https://github.com/FlorenceGalliers/C7081-assessment) repository containing fully reproducible methods script.
 
 The objectives of this analysis were to understand which attributes of the houses can be used to most effectively construct a prediction model for house price, and to then minimise the differences between predicted and actual house price using model selection.
 
-For regression problems the most common way to measure accuracy of a model is by minimising test error. The model that gave the lowest RMSE and therefore was the final approach chosen in this analysis is LASSO (Table 2), however ridge regression and multiple linear regression also gave competitive RMSE. Ridge regression is a far more complicated model than the LASSO as it does not drop out any predictor variables. For the sake of interpretability, the ridge regression model will not be further analysed here. The LASSO generally performs well when there is a few variables with a large influence on response, and a number of variables with a lesser influence, which is the case in this dataset. 
+For regression problems the most common way to measure accuracy of a model is by minimising test error. The model that gave the lowest RMSE and therefore was the final approach chosen in this analysis is LASSO (Table 3), however ridge regression and multiple linear regression also gave competitive RMSE. Ridge regression is a far more complicated model than the LASSO as it does not drop out any predictor variables. For the sake of interpretability, the ridge regression model will not be further analysed here. The LASSO generally performs well when there is a few variables with a large influence on response, and a number of variables with a lesser influence, which is the case in this dataset. 
 
-```{r, Table / Graph of RMSE Values for each approach}
+**Table 3**: Results of each model attempted, with error shown as RMSE = Root Mean Squared Error.
+```{r, Table 3 / Graph of RMSE Values for each approach, echo = FALSE}
+results_table <- read.xlsx("results.xlsx")
+results_table$V2 <- as.numeric(results_table$V2)
+table3_headers <- c("Model", "RMSE")
+kable(results_table, col.names = table3_headers)%>%
+  column_spec(1, border_left = T, width = "7cm") %>%
+  column_spec(2, border_right = T) #%>%
+  # row_spec(1, background = "orange") %>%
+  # row_spec(2, background = "green") %>%
+  # row_spec(3, background = "green") %>%
+  # row_spec(4, background = "coral") %>%
+  # row_spec(5, background = "coral") %>%
+  # row_spec(6, background = "coral") %>%
+  # row_spec(7, background = "lightgreen") %>%
+  # row_spec(8, background = "green") %>%
+  # row_spec(9, background = "darkorange") %>%
+  # row_spec(10, background = "darkorange") %>%
+  # row_spec(11, background = "darkorange") %>%
+  # row_spec(12, background = "orange") %>%
+  # row_spec(13, background = "orange") %>%
+  # row_spec(14, background = "red") %>%
+  # row_spec(15, background = "darkorange") 
+
 
 ```
 
-It is clear that location has a large influence on house price as out of the 34 variables that are left in the model, 26 of them were location dummy variables. The size of the house (sqft_living) was a non-location variable that had the largest influence on house prices. To consider which of the variables had the largest influence on price, a linear model was constructed this time without the location variables, from this the *sqft_living* was the most significant, followed by *bedrooms*, *bathrooms* and *house_age*. This agrees with the plots of influence seen from the randomForest plots that showed these variables to be most influential.
+It is clear that location has a large influence on house price as out of the 34 variables that are left in the LASSO model, 26 of them were location dummy variables. The size of the house (sqft_living) was a non-location variable that had the largest influence on house prices. To consider which of the variables had the largest influence on price, a linear model was constructed this time without the location variables, from this the *sqft_living* was the most significant, followed by *bedrooms*, *bathrooms* and *house_age*. This agrees with the plots of influence seen from the randomForest plots that showed these variables to be most influential.
 
 The LASSO model with the lowest RMSE contained 34 variables, however by changing the lambda value given, the variables can be dropped down to 15, with only a slight increase in RMSE (still lower than any of the other models not brought forward to the results section). These variables are very similar to those that showed significance in the multiple linear regression model carried out with all of the variables.
 
