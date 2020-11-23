@@ -3,6 +3,7 @@
 ## 2020-11-23
 ## C7081 Assignment Methods Script
 
+# 0.0 Set wd and libraries ####
 setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
 
 require(knitr)
@@ -21,16 +22,22 @@ require(psych)
 require(ggcorrplot)
 require(dummies)
 library(openxlsx)
+require(ggfortify)
+require(lmtest)
 
-# Import cleaned data set created after Exploratory Data Analysis
+# 0.1 Import cleaned data set created after Exploratory Data Analysis ####
 data <- read.xlsx("cleaned-data.xlsx")
-
+data$if_basement <- as.factor(data$if_basement)
+data$if_renovated <- as.factor(data$if_renovated)
+data$city <- as.factor(data$city)
+# 0.2 Split Data into Test and Train ####
 set.seed(22) # set seed
 n <- nrow(data) # create variable with number of rows
 train_index <- sample(1:n, size = round(0.8*n), replace=FALSE) 
 train <- data[train_index ,] # takes 80% of the data for training set
 test <- data[-train_index ,] # remaining 20% for the test set
-
+# As we will be using dummy variables further on, I have also created the 
+# test and train data sets containing all the dummy variables 
 dummy_data <- dummy.data.frame(data, sep = ".")
 names(dummy_data)
 dummy_train <- dummy.data.frame(train, sep = ".")
@@ -38,61 +45,102 @@ names(dummy_train)
 dummy_test <- dummy.data.frame(test, sep = ".")
 names(dummy_test)
 
-set.seed(2)
-# create simple linear model using price as dependent variable and sqft_living
+# 1.0 Simple Linear Regression ####
+# Create simple linear model using price as dependent variable and sqft_living
 # as independent variable, and training data set
+set.seed(2)
 simple_lm <- lm(price ~ sqft_living, 
                 data = train)
-# make predictions using this model on test data set
+# Make predictions using this model on test data set
 simple_pred <- predict(simple_lm, 
                        test) 
-# calculate MSE of simple linear model
+# calculate MSE
 simple_lm_MSE <- mean((test[, "price"] - simple_pred)^2)
 # calculate RMSE
 simple_lm_RMSE <- sqrt(simple_lm_MSE)
-
 # print summary of model
 summary(simple_lm)
 
-# create a multiple linear model using price as dependent variable and all
+# 2.0 Multiple Linear Regression ####
+# Create a multiple linear model using price as dependent variable and all
 # other variables, training data set
 multiple_lm <- lm(price ~ bedrooms+bathrooms+sqft_living+sqft_lot+floors+condition
                   +if_basement+house_age+if_renovated+city,
                   data = train)
-# make predictions using this model on test data set
-multiple_pred <- predict(multiple_lm,
-                         test)
-# calculate MSE of multiple linear model
+# Make predictions on test data set
+multiple_pred <- predict(multiple_lm, test)
+# calculate MSE 
 multiple_lm_MSE <- mean((test[, "price"] - multiple_pred)^2)
-# calculate RMSE of multiple linear model
+# calculate RMSE
 multiple_lm_RMSE <- sqrt(multiple_lm_MSE)
-
 # print summary of model
 summary(multiple_lm)
 
+# 2.1 Investigate Collinearity of model containing all variables ####
 vif(multiple_lm)
 
+# 2.2 Multiple Linear Regression with Selected Variables ####
+# Create a linear model with only the variables that showed significance in the previous multiple linear model.
+multiple_selective <- lm(price ~ bedrooms+bathrooms+sqft_living+condition+
+                           if_basement.1+house_age+city.Bellevue+city.Issaquah+
+                           city.Kent+city.Kirkland+city.Medina+city.Mercerisland+
+                           city.Redmond+city.Sammamish+city.Seattle+city.Shoreline+
+                           city.Woodinville, data = dummy_train)
+# Make predictions using this model on test data set
+multi_select_pred <- predict(multiple_selective, dummy_test)
+# calculate MSE of model
+multiple_select_MSE <- mean((dummy_test[, "price"] - multi_select_pred)^2)
+# calculate RMSE of model
+multiple_select_RMSE <- sqrt(multiple_select_MSE)
+# print summary of model
+summary(multiple_selective)
+# Plot diagnostic plots
+par(mfrow=c(2,2))
+plot(multiple_selective)
+# 1. Assumption of linear relationship holds true as horizontal line
+# 2. Residuals follow line but there are some points with high influence, 4296, 4292, 2252
+# 3. Variability of residuals increases as fitted values increase
+# Breusch Pagen Test for homoscedasticity
+bptest(multiple_selective) # p > 0.05 so accept null hypothesis, we have homoscedasticity here
+# 4. No points exceeding Cook's distance, point 4296 is just on the borderline.
 
+# Histogram of Residuals
+hist(multiple_selective$residuals, breaks = 500)
+# It has a tail... not normally distributed
+
+par(mfrow=c(1,1))
+# Plot actual vs predicted values for this model
+plot(dummy_test[,"price"], multi_select_pred)
+
+multiple_log <- lm(log(price) ~ bedrooms+bathrooms+sqft_living+condition+
+                           if_basement.1+house_age+city.Bellevue+city.Issaquah+
+                           city.Kent+city.Kirkland+city.Medina+city.Mercerisland+
+                           city.Redmond+city.Sammamish+city.Seattle+city.Shoreline+
+                           city.Woodinville, data = dummy_train)
+# Make predictions using this model on test data set
+log_pred <- predict(multiple_log, dummy_test)
+# calculate MSE of model
+m_log_MSE <- mean((dummy_test[, "price"] - log_pred)^2)
+# calculate RMSE of model
+m_log_RMSE <- sqrt(m_log_MSE)
+
+# 3.0 Best Subset Selection ####
 # Fit subset selection model
 bestsub <- regsubsets(price ~ .,
                       data = train,
                       nvmax = 25)
-
 # Create test matrix
 test_matrix <- model.matrix(price ~ .,
                             data = test)
-
 # Create loop for finding validation errors for a model of each size
 val_errors <- rep(NA, 25)
 for(i in 1:25) {
   coefi <- coef(bestsub, id = i)
   pred <- test_matrix[ ,names(coefi)]%*%coefi
-  val_errors[i] = mean((test$price - pred)^2)
-}
-
-val_errors
-which.min(val_errors)
-plot(val_errors)
+  val_errors[i] = mean((test$price - pred)^2)}
+val_errors # print validation errors
+which.min(val_errors) # print the minimum validation error
+plot(val_errors) # plot validation errors 
 # shows which number of variables has the lowest validation error
 coef(bestsub, 23) # 23 variables is optimal from validation error
 
@@ -102,8 +150,7 @@ predict.regsubsets <- function(object, newdata, id, ...){
   mat <- model.matrix(form, newdata)
   coefi <- coef(object, id=id)
   xvars <- names(coefi)
-  mat[, xvars]%*%coefi
-}
+  mat[, xvars]%*%coefi}
 
 # Choosing among models of different sizes using cross-validation
 k <- 5
@@ -122,13 +169,13 @@ for(j in 1:k){
   }
 }
 
-mean.cv.errors <- apply(cv.errors, 2, mean)
-mean.cv.errors
+mean.cv.errors <- apply(cv.errors, 2, mean) # average cv errors into table
+mean.cv.errors # get the mean cv error for models of each size
 
 plot(mean.cv.errors, type = "b")
 which.min(mean.cv.errors) #shows that min cv.error is with 19 variables
 
-mean.cv.errors[19]
+mean.cv.errors[19] # get mean cv error for 19 variable model
 
 # Create new test and train data sets containing only the best 19 variables as 
 # selected by best subset selection
@@ -156,7 +203,7 @@ final_bestsub_MSE <- mean((best_test[, "price"] - final_bestsub_pred)^2)
 final_bestsub_RMSE <- sqrt(final_bestsub_MSE)
 
 
-# Forward Stepwise Selection
+# 4.0 Forward Stepwise Selection ####
 forward_model <- regsubsets(price ~ ., 
                          data = data, 
                          nvmax = 25,
@@ -202,7 +249,7 @@ forward_MSE <- mean((forward_test[, "price"] - forward_pred)^2)
 # calculate RMSE of best 15 variable model from subset selection
 forward_RMSE <- sqrt(forward_MSE)
 
-# Backward Stepwise Selection
+# 5.0 Backward Stepwise Selection ####
 backward_model <- regsubsets(price ~ ., 
                          data = data, 
                          nvmax = 25, 
@@ -246,6 +293,7 @@ backward_MSE <- mean((backward_test[, "price"] - backward_pred)^2)
 # calculate RMSE of best 15 variable model from subset selection
 backward_RMSE <- sqrt(backward_MSE)
 
+# 6.0 Ridge Regression ####
 # Fit a ridge regression, choose lambda by cross validation
 set.seed(1)
 # Split train and test data into x and y 
@@ -269,6 +317,7 @@ ridge.pred <- predict(ridge.mod,
 ridge_MSE <- mean((ridge.pred - y_test)^2) 
 ridge_RMSE <- sqrt(ridge_MSE) 
 
+# 7.0 LASSO Regression ####
 set.seed(1)
 # Fit lasso model
 lasso_mod <- glmnet(x_train, 
@@ -290,12 +339,12 @@ lasso_cv <- cv.glmnet(x_train,
 # Plot values of MSE against lambda, can see it is fairly stable but starts to 
 # increase slightly after less than 18 variables are included in the model
 plot(lasso_cv)
+
 # Assign the lowest value of lambda to an object
 best_lamb <- lasso_cv$lambda.min
 # Use this value of lambda to make predictions on test data set
 lasso_pred <- predict(lasso_mod, s = best_lamb, 
                       newx = x_test)
-
 # Report test error and number of non zero coefficients for LASSO
 lasso_MSE <- mean((lasso_pred - y_test)^2)
 lasso_RMSE <- sqrt(lasso_MSE)
@@ -303,12 +352,43 @@ lasso_RMSE <- sqrt(lasso_MSE)
 out <- glmnet(x_train, y_train, alpha = 1)
 lasso_coef <- predict(out, type = "coefficients", 
                       s = best_lamb)
-lasso_coef
-# This drops 6 variables to have coefficients == 0, so leaves a 35 variable model
+lasso_coef # show coefficients for the model
+lasso_mod$lambda # show values of lamba tried
+lasso_mod$df[55] # Get number of variables in model with best lambda value
+# A 34 variable model
 
-# Plot shows percentage of deviance explained
-plot(lasso_mod, xvar="dev", label=TRUE)
+estimates <- as.vector(coef(lasso_mod, s = best_lamb, exact = TRUE))
+norm. <- sum(abs(estimates))
+plot(lasso_mod, xlim = range(0, norm., as.vector(lasso_mod$beta)))
+abline(v = norm., col = "red")
 
+# However from cross validation plot we can see that the error is quite stable
+# until
+lasso_cv$cvm
+
+
+# Assign a different value of lambda to an object
+alt_lamb <- lasso_cv$lambda[33]
+# Use this value of lambda to make predictions on test data set
+lasso_pred2 <- predict(lasso_mod, s = alt_lamb, 
+                      newx = x_test)
+# Report test error and number of non zero coefficients for LASSO
+lasso2_MSE <- mean((lasso_pred2 - y_test)^2)
+lasso2_RMSE <- sqrt(lasso2_MSE)
+
+lasso2_coef <- predict(out, type = "coefficients", 
+                      s = alt_lamb)
+lasso2_coef # show coefficients for the model
+lasso_mod$df[33] # Get number of variables in model with alternative lambda
+# value = 15 variables
+
+
+estimates <- as.vector(coef(lasso_mod, s = best_lamb, exact = TRUE))
+norm. <- sum(abs(estimates))
+plot(lasso_mod, xlim = range(0, norm., as.vector(lasso_mod$beta)))
+abline(v = norm., col = "red")
+
+# 8.0 Simple Decision Tree ####
 set.seed(1)
 # Fit a simple decision tree using data with only variables selected by best-subset
 # selection as tree() function has a limit on number of variables
@@ -340,6 +420,7 @@ abline(0, 1)
 tree_MSE <- mean((yhat - testdata)^2)
 tree_RMSE <- sqrt(tree_MSE)
 
+# 9.0 Bagging ####
 set.seed(1)
 # Create a tree using bagging
 rf_tree <- randomForest(price ~ ., 
@@ -383,6 +464,7 @@ plot(rf_100)
 rf_100_MSE <- mean((rf_100_pred - testdata)^2)
 rf_100_RMSE <- sqrt(rf_100_MSE)
 
+# 10.0 RandomForests ####
 # Now going to do RandomForest with m = 3
 rf_m3 <- randomForest(price ~ ., 
                       data = best_train,
@@ -420,6 +502,7 @@ importance(rf_m3_30)
 varImpPlot(rf_m3_30)
 # sqft_living is by far the most influential variable shown here.
 
+# 11.0 Boosting ####
 set.seed(1)
 boost_house <- gbm(price ~ ., 
                    data = best_train,
@@ -466,6 +549,7 @@ boost2_RMSE <- sqrt(boost2_MSE)
 # Changing lambda has greatly improved accuracy, but is not competitive with
 # other models.
 
+# 12.0 Results ####
 RMSE_comparison <- c(simple_lm_RMSE,
                      multiple_lm_RMSE,
                      final_bestsub_RMSE,
@@ -506,3 +590,18 @@ RMSE_lowest <- c( multiple_lm_RMSE,
                   ridge_RMSE)
 
 plot(RMSE_lowest)
+
+# 13.0 Trialling Linear Regression without Location variables ####
+new_train <- train[, -11]
+new_test <- test[, -11]
+
+linear_mod <- lm(price ~ ., data = new_train)
+# Make predictions on test data set
+linear_pred <- predict(linear_mod, new_test)
+# calculate MSE 
+linear_MSE <- mean((new_test[, "price"] - linear_pred)^2)
+# calculate RMSE
+linear_RMSE <- sqrt(linear_MSE)
+# print summary of model
+summary(linear_mod)
+
