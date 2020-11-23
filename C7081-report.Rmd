@@ -11,206 +11,6 @@ bibliography: ["ref.bib"]
 biblio-style: "harvard"
 link-citations: true
 ---
-```{r, set wd / libraries / reading in data, include = FALSE}
-setwd("~/Google Drive/Harper/1-C7081/Asssesment/github-C7081/C7081-assessment")
-
-require(knitr)
-require(ggplot2)
-require(glmnet)
-require(pls)
-require(leaps)
-require(tree)
-require(randomForest)
-require(gbm)
-require(dummies)
-library(plyr)
-library(writexl)
-library(psych)
-library(ggcorrplot)
-library(dummies)
-
-# Import original data set as downloaded from Kaggle
-# https://www.kaggle.com/shree1992/housedata
-data <- read.csv(file = "original-data.csv")
-
-# This script is intended to get to know the data, select the best variables to 
-# take forward in a cleaned data set to use in my analysis and visualise any
-# existing patterns or correlations in the data.
-
-# First I am will go through each of the variables from the original data set
-
-#1 Date (not included in analysis)
-summary(data$date)
-# This is a character variable giving the date of the sale of the house, as I will
-# not be looking at price over time, this variable is not going to be included in my
-# analysis.
-
-#2 Price (dependent variable for analysis)
-summary(data$price)
-# Numeric variable giving sale price of house in US dollars
-# We can see the max price is well above the 3rd quartile value, this may be due 
-# to some outlying values. Will look into this later.
-# best to convert this variable into thousands of dollars to make it more manageable
-data$price <- data$price/1000
-# Look if any values are = 0, assign them to variable
-zero_values <- which(data$price == 0)
-# Remove these from the data set as house price cannot be $0
-data <- data[-zero_values,]
-
-#3 Bedrooms
-summary(data$bedrooms)
-# There are between 0 and 9 bedrooms in each house, mean of just over 3 bedrooms
-hist(data$bedrooms)
-# Histogram shows normal distribution of number of bedrooms, can also see they 
-# are discrete values.
-plot(data$bedrooms) # normal distribution
-plot(data$bedrooms, data$price) # price increase with increase in bedrooms?
-
-#4 Bathrooms
-summary(data$bathrooms)
-#There are between 0 and 8 bathrooms in each house, mean of just over 2 bathrooms
-hist(data$bathrooms)
-plot(data$bathrooms, data$price) # may be positive correlation between no of 
-# bathrooms and price of house
-bathrooms <- as.factor(data$bathrooms)
-plot(bathrooms, data$price)
-
-#5 sqft_living
-summary(data$sqft_living) 
-plot(data$sqft_living, data$price)
-#can see that as sqft of living area increases, price increases
-
-#6 sqft_lot
-summary(data$sqft_lot)
-plot(data$sqft_lot, data$price)
-
-#7 Floors
-summary(data$floors) #between 1 and 3.5 floors for each house, mean of 1.5
-plot(data$floors, data$price)
-
-#8 Waterfront (not included in analysis)
-plot(data$waterfront) #not many values for this
-data$waterfront <- as.factor(data$waterfront)
-count(data$waterfront) #only 33 values as 'YES' for having a waterfront
-#lets remove this variable from our dataset
-
-#9 View (not included in analysis)
-summary(data$view)
-plot(data$view)
-data$view <- as.factor(data$view)
-count(data$view)
-#most houses score 0 for view, or the data is missing
-#lets remove this variable from our dataset.
-
-#10 Condition
-summary(data$condition) #looks like 5 levelled rating on condition
-plot(data$condition)
-#lets convert to a factor
-#data$condition <- as.factor(data$condition)
-#count(data$condition) #majority have condition 3,4,5 which is not suprising 
-plot(data$condition, data$price) #looks like price may not change too much with
-#condition
-
-#11 sqft_above (not included in analysis)
-summary(data$sqft_above)
-plot(data$sqft_above, data$price)
-#looks to be a correlation, but is this just the same as sqft_living as not 
-#all properties have basements (see below) - remove this variable
-cor(data$sqft_above, data$sqft_living) #88% correlated with sqft_living
-
-#12 sqft_basement
-summary(data$sqft_basement)
-plot(data$sqft_basement) #can see a lot of properties have 0 value for this 
-#which means they do not have a basement, lets convert this into a binary variable
-#instead, with 0 = no basement and 1 = basement
-data$sqft_basement <- ifelse(data$sqft_basement == 0, 0, 1)
-#change column name from sqft_basement to if_basement
-names(data)[names(data) =="sqft_basement"] <- "if_basement"
-data$if_basement <- as.factor(data$if_basement)
-
-#13 yr_built
-plot(data$yr_built, data$price)
-#it is treating this as a numeric continuous variable, lets change it into age
-#of house instead of year built.
-end_year <- 2014 #year data is from
-#calculate age of each house is years
-data$yr_built <- end_year - data$yr_built
-#change column name from yr_built to house_age
-names(data)[names(data)=="yr_built"] <- "house_age"
-#converted age into categorical variable with 10 year age groups
-#data$house_age <- cut(data$house_age, 
-  #  breaks = c(-Inf, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, Inf),
-   # labels = c("0-10", "11-20", "21-30", "31-40", "41-50",
-    #           "51-60", "61-70", "71-80", "81-90", "91-100", "100+"))
-#levels(data$house_age)
-#count(data$house_age)
-plot(data$house_age, data$price) #doesn't look like age has too much of an effect
-#on price
-
-#14 yr_renovated
-count(data$yr_renovated) #we can see there are 2706 zero values which means not
-#all properties have been renovated. lets change into a binary variable where 
-# 0 = no renovation and 1 = has been renovated
-data$yr_renovated <- ifelse(data$yr_renovated == 0, 0, 1)
-# change column name from yr_renovated to if_renovated
-names(data)[names(data) =="yr_renovated"] <- "if_renovated"
-count(data$if_renovated) 
-boxplot(data$if_renovated, data$price)
-data$if_renovated <- as.factor(data$if_renovated)
-
-#15 Street (not included in analysis)
-summary(data$street) #character variable giving street name
-data$street <- as.factor(data$street) #all unique names - not going to be much
-#help in predicting price so lets remove this from the dataset
-
-#16 City
-summary(data$city) #character variable giving city that houses are located in
-data$city <- as.factor(data$city)
-count(data$city) #gives factor with 44 levels, some only have one or two houses in
-#lets remove observations for those cities with less than 5 houses.
-lowfreq_cities <- c(which(data$city == "Algona"),
-                    which(data$city == "Beaux Arts Village"),
-                    which(data$city == "Inglewood-Finn Hill"),
-                    which(data$city == "Milton"),
-                    which(data$city == "Preston"),
-                    which(data$city == "Skykomish"),
-                    which(data$city == "Snoqualmie Pass"),
-                    which(data$city == "Yarrow Point"))
-data <- data[-lowfreq_cities,] #left with 4532 observations after removing these
-#low frequency cities
-data$city <- droplevels(data$city) #drop these unused levels from dataset
-plot(data$city, data$price) #definitely looks to be some cities with higher prices
-# change factor level names so they do not inlcude spaces
-levels(data$city) <- c("Auburn", "Bellevue", "Blackdiamond", "Bothell", "Burien",
-                       "Carnation", "Clydehill", "Covington", "Desmoines",
-                       "Duvall", "Enumclaw", "Fallcity", "Federalway", 
-                       "Issaquah", "Kenmore", "Kent", "Kirkland", 
-                       "Lakeforestpark", "Maplevalley", "Medina", 
-                       "Mercerisland", "Newcastle", "Normandypark", 
-                       "Northbend", "Pacific", "Ravensdale", "Redmond", "Renton",
-                       "Sammamish", "SeaTac", "Seattle", "Shoreline", "Snoqualmie",
-                       "Tukwila", "Vashon", "Woodinville")
-          
-#17 State zipcode
-summary(data$statezip)
-data$statezip <- as.factor(data$statezip) #73 unique variables? is this too many?
-plot(data$statezip, data$price) #definitely some here with higher values than others
-
-#18 Country (not included in analysis)
-# constant variable, so lets remove
-
-variables_to_remove <- c(1, 8, 9, 11, 15, 17, 18)
-# Date, Waterfront, View, sqft_above, Street, Country
-data <- data[ ,-variables_to_remove]
-
-# We are left with 11 variables after the initial EDA
-
-# Remove outliers identified throughout.
-outliers <- c(100, 121, 122, 2271, 2387, 2921, 4324, 4325, 4328, 4329)
-data <- data[-outliers, ]
-
-# Final number of observations is 4522```
-```
 
 # Background:
 House prices are an important part of the economy and usually reflect trends in it. They can be influenced by the physical condition of the house and by other attributes such as location [@bin2004prediction]. Prices are important for homeowners, prospective buyers and estate agents, prediction methods could help lead to more informed decisions to each of these stakeholders. @gao2019location suggest that prediction models may be useful for narrowing down the range of available houses for prospective buyers and allowing sellers to predict optimal times to list thier houses on the market. Prediction accuracy is important in all of these situations.
@@ -219,7 +19,7 @@ In most countries there is some form of house price index that measures changes 
 
 Something else to take into account is that it may be difficult for prospective buyers to visualise how square footage measurements of a house are calculated or how this measurement translates into physical size if they have not visited the house themselves. Buyers therefore rely on factors such as the number of bedrooms, bathrooms or house age to get an idea of the value of the house. This analysis will focus on which features of a house have the largest influence on the prediction of house prices. This report does not look at the effect of time on house prices. It is already well known that house prices increase every year [@alfiyatin2017modeling]. 
 
-Many house price prediction models have been created using machine learning methods. The hedonic price model is the most extensively researched and uses regression methods [@gao2019location]. Machine learning methods use data in a ‘training set’ to build a model, this model is then used to make predictions on an unseen ‘test set’ of data. The accuracy of models can be calculated by taking the predicted values from the actual values.
+Many house price prediction models have been created using machine learning methods. The hedonic price model is the most extensively researched and uses regression methods [@gao2019location]. The goal of regression methods is to build an equation which defines y, the dependent variable as a function of the x variable(s). This equation can then be used for prediction of y when given unseen values of x. Machine learning methods use data in a ‘training set’ to build a model, this model is then used to make predictions on an unseen ‘test set’ of data. The accuracy of models can be calculated by taking the predicted values from the actual values.
 
 ## Objectives:
 * Understand which attributes of houses given in the data set can be used to effectively construct a prediction model for house price (dependent variable).
@@ -231,84 +31,36 @@ Many house price prediction models have been created using machine learning meth
 The dataset chosen for this analysis is from houses sold in 2014 in Washington, USA. It contains the sale price (US dollars) along with attributes of each house such as number of bedrooms, number of bathrooms, etc. There were 4600 observations with 17 variables in the original data set downloaded from [Kaggle] (https://www.kaggle.com/shree1992/housedata).
 Although the dataset is from 2014, it was a particularly interesting data set because it contains a large amount of information and an interesting selection of variables. A more recent data set, or one from the UK could not be found, and so this analysis will go ahead with this data set.
 
-## Data Preparation
-The first task was preparing and cleaning the dataset. This served two purposes, firstly to get to know the different variables in the data and existing patterns or correlations between them and secondly to carry out feature selection. Missing values were searched for and removed and any observations in which price equalled zero were removed. The cleaned dataset was exported ready for use in the main analysis. This cleaned data set contained 4522 observations and 12 variables (Table 1).
-
+## Data Preparation and Exploration
+The first task was preparing and cleaning the dataset. This served two purposes, firstly to get to know the different variables in the data and existing patterns or correlations between them and secondly to carry out feature selection. Missing values were searched for and removed and any observations in which price equalled zero were removed. The cleaned dataset was exported ready for use in the main analysis. This cleaned data set contained 4522 observations and 11 variables (Table 1).
 ```{r, Table 1, echo = FALSE}
 
-#insert table 1
-data_descriptions <- c("House sale price in thousands of US dollars, calculated 
-                       by dividing house price by 1000", 
-                       "Number of bedrooms",
-                       "Number of bathrooms",
-                       "Area of house in square feet",
-                       "Area of whole housing lot in square feet",
-                       "Number of floors in the house",
-                       "Condition of house, 1 to 5",
-                       "1 = if house has a basement, 0 = no basement",
-                       "Age of house. Calucated by subtrating year that the 
-                       house was built from 2014 (the year the house was sold)",
-                       "1 = if house has been renovated, 0 = if no renovation",
-                       "Location of house to the nearest city in Washington, USA, 
-                       these names have had the spaces removed and any city with less
-                       than 5 houses were removed from the dataset")
-
-
-data_dictionary <- data.frame(names(data), data_descriptions)
-
-kable(data_dictionary,
-    col.names = c("Variable", "Description"),
-    caption = "Data Dictionary")
-
 ```
 
 
-# Methods
-House price is a continuous variable and so a supervised learning approach was chosen throughout. In a supervised learning approach there is a response variable, in this case house price, and then a number of predictor variables. All the approaches tried were regression methods in which house price is a quantitative variable. 
+## Data Visualisation
+The cleaned data set was explored to look for any correlations between variables. The dependent variable (price) had a positive correlation with sqft_living, number of bathrooms and number of bedrooms. The strongest relationship seen was between sqft_living and number of bathrooms. It is interesting to note that the only non significant correlation involving price is between price and house age.
 
-The dataset was split randomly into two parts, a training set containing 80% of the observations and a test set containing the remaining 20%. The training set will be used to train all of the models and the test set will be used to assess accuracy of the models. 
-
-```{r, splitting into training and test set, include = FALSE}
-set.seed(2) # set seed
-n <- nrow(data) # create variable with number of rows
-train_index <- sample(1:n, size = round(0.8*n), replace=FALSE) 
-train <- data[train_index ,] # takes 80% of the data for training set
-test <- data[-train_index ,] # remaining 20% for the test set
-
-dummy_data <- dummy.data.frame(data, sep = ".")
-names(dummy_data)
-
-dummy_train <- dummy.data.frame(train, sep = ".")
-names(dummy_train)
-
-dummy_test <- dummy.data.frame(test, sep = ".")
-names(dummy_test)
+```{r, Correlation Plot, echo = FALSE}
+ 
 ```
+
+
+# Analysis Methods
+House price is a continuous variable and so a supervised learning approach was chosen throughout. In a supervised learning approach there is a response variable, in this case house price, and then a number of predictor variables. All the approaches tried were regression methods in which house price was a quantitative variable. 
+
+The dataset was split randomly into two parts, a training set containing 80% of the observations and a test set containing the remaining 20%. The training set was used to train all of the models and the test set to assess accuracy of the models. 
  
 ## Linear Regression
 To begin, a simple linear regression model was created using price as the dependent variable (y) and square foot living area (sqft_living) as the independent variable (x). Sqft_living was chosen because it was shown to be the most correlated variable to house price in the exploratory data analysis. 
-A simple linear regression model uses the *lm* function. Linear regression takes a model with equation
+A simple linear regression model uses the *lm()* function. Linear regression takes a model with equation
+
 y = B0 + B1x + E
-and estimated coeffients which produce a line of best fit, minimising the difference between predicted and actual values. This type of simple linear regression is known as ordinary least squares.
- 
-```{r, Simple lm, include = FALSE}
-# create simple linear model using price as dependent variable and sqft_living
-# as independent variable, and training data set
-simple_lm <- lm(price ~ sqft_living, 
-               data = train)
-# make predictions using this model on test data set
-simple_pred <- predict(simple_lm, 
-                       test) 
-# calculate MSE of simple linear model
-simple_lm_MSE <- mean((test[, "price"] - simple_pred)^2)
-# calculate RMSE
-simple_lm_RMSE <- sqrt(simple_lm_MSE)
 
-# print summary of model
-summary(simple_lm)
-```
+and estimates coefficients which produce a line of best fit, minimising the difference between predicted and actual values. This type of simple linear regression is known as ordinary least squares.
 
-This simple model was then expanded to allow all the other variables in the dataset, this is a multiple linear regression. The model output showed that 15 of these variables had a significant impact (P<0.01) on the price, they were:
+This simple model was then expanded to allow all the other variables in the dataset, this is multiple linear regression. The model output showed that 15 of these variables had a significant impact (P<0.01) on the price, they were:
+
 * bedrooms
 * bathrooms
 * sqft_living
@@ -323,413 +75,70 @@ This simple model was then expanded to allow all the other variables in the data
 * city.Mercerisland
 * city.Redmond
 * city.Sammamish
-* city.Seattle
+* city.Seattle 
 
-```{r, Multiple lm, include = FALSE}
-# create a multiple linear model using price as dependent variable and all
-# other variables, training data set
-multiple_lm <- lm(price ~ bedrooms+bathrooms+sqft_living+sqft_lot+floors+condition
-                  +if_basement+house_age+if_renovated+city,
-                  data = train)
-# make predictions using this model on test data set
-multiple_pred <- predict(multiple_lm,
-                       test)
-# calculate MSE of multiple linear model
-multiple_lm_MSE <- mean((test[, "price"] - multiple_pred)^2)
-# calculate RMSE of multiple linear model
-multiple_lm_RMSE <- sqrt(multiple_lm_MSE)
+It should be noted that *if_basement*, *if_renovated* and *city* were all factor variables, and so when they were fit into a model, they were converted into dummy variables, with one for each factor level. This is why some of the variables selected above are not the same as those variables shown in the cleaned data set. This also raises the idea that location has a large influence on house price as 10 of the most influential variables shown above are all dummy variables originating from *city*.
 
-# print summary of model
-summary(multiple_lm)
-
-
-```
+Multicollinearity was also explored from the multiple linear model. The variance inflation factors (VIF) for each variable was calculated which shows how much of the variance of the regression coefficient is inflated due to any multicollinearity in the model. None of the VIF were above 5, with the highest being *bathrooms* at 3.3, and so there was no problematic collinearity indicated. This was carried out using the *vif()* function in the *car* package.
  
 ## Variable Selection Methods
-To look into this further and conclude which variables were most influential on price, variable selection methods were explored. Best subset selection is a method that finds the best combinations of predictors that produce the best fit in terms of squared error. Forward selection is slightly different as it starts with no variables and one by one adds the variable which gives the smallest increase in squared error. Backward selection follows the same idea as forward selection but it starts with a full model, and iteratively removes variables until it leaves a one variable model with the lowest mean squared error. 
+To look further into which variables were most influential on price, variable selection methods were explored. Best subset selection is a method that finds the best combinations of predictors that produce the best fit in terms of squared error. Forward selection is slightly different as it starts with no variables and one by one adds the variable which gives the smallest increase in squared error. Backward selection follows the same idea as forward selection but it starts with a full model, and iteratively removes variables until it leaves a one variable model with the lowest mean squared error. 
 
-Using cross-validation in best subset selection, a model with 15 variables was shown have the lowest cross-validation error. These variables were extracted and a linear model created containing only them. This linear model had a lower RMSE than either of the simple or multiple linear models tried above. It was decided that going forward, these variables would be the ones used to trial other methods.
+In best subset selection, cross-validation was used to choose among variables of differing sizes. This is a direct method of estimating test error. A model with 15 variables had the lowest cross-validation error. These variables were extracted and a linear model created containing only them. This linear model had a lower MSE than either of the simple or multiple linear models tried above. 
 
-Forward and backward selection yielded almost idential results to each other with only a one variable difference to best-subset selection, so the variables chosen using best-subset selection were the ones used.
+If we had used R2 statistics to assess the models, we would always end up with a model containing all of the variables as the 'best' one. In this analysis direct methods of test error estimation were used, however as an alternative, adjusted R2, CP or BIC criterion may have been used to indirectly estimate the test error. Validation set approach was also take to estimate test error, this gave a model with many more variables and so it was decided that cross-validation was the most appropriate method to use to help narrow down the variables to the most influential.
 
-```{r, Variable Selection, include = FALSE}
-# Fit subset selection model
-bestsub <- regsubsets(price ~ .,
-                      data = train,
-                      nvmax = 44)
+Forward and backward selection yielded almost identical results to each other with only a one variable difference to best-subset selection. The variables selected from best-subset selection were also very similar to the ones that showed a significant effect in the multiple linear model, with only one variable different. Forward and backward subset selection methods gave lower MSE results than best-subset selection.
 
-summary(bestsub)
-
-# Create test matrix
-test_matrix <- model.matrix(price ~ .,
-                            data = test)
-
-# Create loop for finding validation errors for a model of each size
-val_errors <- rep(NA, 44)
-for(i in 1:44) {
-  coefi <- coef(bestsub, id = i)
-  pred <- test_matrix[ ,names(coefi)]%*%coefi
-  val_errors[i] = mean((test$price - pred)^2)
-}
-
-val_errors
-which.min(val_errors)
-# shows which number of variables has the lowest validation error
-coef(bestsub, 34) # 34 variables is optimal from validation error
-
-# create prediction formula 
-predict.regsubsets <- function(object, newdata, id, ...){
-  form <- as.formula(object$call[[2]])
-  mat <- model.matrix(form, newdata)
-  coefi <- coef(object, id=id)
-  xvars <- names(coefi)
-  mat[, xvars]%*%coefi
-}
-
-# Choosing among models of different sizes using cross-validation
-k <- 5
-set.seed(1)
-folds <- sample(1:k, nrow(data), replace = TRUE)
-cv.errors <- matrix(NA, k, 44, dimnames = list(NULL, paste(1:44)))
-
-for(j in 1:k){
-  best.fit <- regsubsets(price ~ ., 
-                         data = data[folds!=j,],
-                         nvmax = 44)
-  for (i in 1:44) {
-    pred <- predict.regsubsets(best.fit, 
-                               data[folds==j,], 
-                               id = i)
-    cv.errors[j, i] = mean((data$price[folds==j] - pred)^2)
-  }
-}
-
-mean.cv.errors <- apply(cv.errors, 2, mean)
-mean.cv.errors
-
-plot(mean.cv.errors, type = "b")
-which.min(mean.cv.errors) #shows that min cv.error is with 15 variables
-
-mean.cv.errors[15]
-
-summary(best.fit)
-
-# Create new test and train data sets containing only the best 15 variables as 
-# selected by best subset selection
-best_train <- dummy_train[c(1, 2, 3, 4, 9, 10, 14, 19, 
-                          26, 29, 32, 33, 39, 41, 43, 44)]
-
-best_test <- dummy_test[c(1, 2, 3, 4, 9, 10, 14, 18, 
-                          25, 28, 31, 32, 37, 39, 41, 42)]
-
-# Run linear model using only the best 15 variables selected from best subset selection
-final_bestsub <- lm(price ~ .,
-                    data = best_train)
-
-summary(final_bestsub)
-
-# make predictions using this model on test data set
-final_bestsub_pred <- predict(final_bestsub,
-                              best_test)
-
-# calculate MSE of best 15 variable model from subset selection
-final_bestsub_MSE <- mean((best_test[, "price"] - final_bestsub_pred)^2)
-# calculate RMSE of best 15 variable model from subset selection
-final_bestsub_RMSE <- sqrt(final_bestsub_MSE)
-
-
-# Forward Stepwise Selection
-regfit.fwd <- regsubsets(price ~ ., 
-                         data = data, 
-                         nvmax = 44,
-                         method = "forward")
-
-summary(regfit.fwd)
-
-# Create new test and train data sets containing only the best 15 variables as 
-# selected by forward selection
-forward_train <- dummy_train[c(1, 2, 3, 4, 9, 10, 14, 19, 
-                          26, 29, 32, 33, 39, 41, 43, 44)]
-
-forward_test <- dummy_test[c(1, 2, 3, 4, 9, 10, 14, 18, 
-                          25, 28, 31, 32, 37, 39, 41, 42)]
-
-# Run linear model using 15 variables from forward selection
-forward_model <- lm(price ~ .,
-                    data = forward_train)
-
-summary(forward_model)
-# make predictions using this model on test data set
-forward_pred <- predict(forward_model,
-                        forward_test)
-# calculate MSE of best 15 variable model from subset selection
-forward_MSE <- mean((forward_test[, "price"] - forward_pred)^2)
-# calculate RMSE of best 15 variable model from subset selection
-forward_RMSE <- sqrt(forward_MSE)
-
-# Backward Stepwise Selection
-regfit.bwd <- regsubsets(price ~ ., 
-                         data = data, 
-                         nvmax = 44, 
-                         method = "backward")
-
-summary(regfit.bwd)
-
-# Create new test and train data sets containing only the best 15 variables as 
-# selected by forward selection
-backward_train <- dummy_train[c(1, 2, 3, 4, 9, 10, 14, 19, 
-                          26, 29, 32, 33, 39, 41, 43, 44)]
-
-backward_test <- dummy_test[c(1, 2, 3, 4, 9, 10, 14, 18, 
-                          25, 28, 31, 32, 37, 39, 41, 42)]
-
-# Run linear model using 15 variables from backward selection
-backward_model <- lm(price ~ .,
-                     data = backward_train)
-
-summary(backward_model)
-# make predictions using this model on test data set
-backward_pred <- predict(backward_model,
-                         backward_test)
-# calculate MSE of best 15 variable model from subset selection
-backward_MSE <- mean((backward_test[, "price"] - backward_pred)^2)
-# calculate RMSE of best 15 variable model from subset selection
-backward_RMSE <- sqrt(backward_MSE)
-
-```
+Polynomial models of regression were trialed but they did not improve RMSE results, so this approach was not looked into further. The relationship between sqft_living and price looked to be linear in the exploratory data analysis so this was not a surprising development.
 
 ## Ridge Regression and LASSO
-Ridge Regression and the LASSO are both shrinkage methods. 
+Ridge Regression and the LASSO are both shrinkage methods. In the above variable selection methods, only a subset of predictors are used. In shrinkage methods all of the predictors are included in the model but the coefficient estimates are constrained towards zero.
  
-Ridge Regression utilises L2 regularisation, this adds a penalty to the coefficients that is equal to the square of the coefficients.
+Ridge Regression utilises L2 regularisation, this adds a penalty to the coefficients that is equal to the square of the coefficients. Lambda is a tuning parameter, as its magnitude increases, the shrinkage penalty has more of an impact and the coefficient estimates will be closer to zero. Selecting the right value of lambda is very important, in this analysis it was selected using cross-validation. If lambda = 0, this method would be identical to ordinary least squares.
 
-```{r, ridge regression, include = FALSE}
-# Fit a ridge regression, choose lambda by cross validation
-set.seed(1)
-# Split train and test data into x and y 
-x_train <- model.matrix(price ~ ., data = best_train)[,-1]
-x_test <- model.matrix(price ~ ., data = best_test)[,-1]
-y_train <- best_train$price
-y_test <- best_test$price
-# Finding optimal value of lambda using cross validation
-cv.ridge <- cv.glmnet(x_train, 
-                      y_train, 
-                      alpha = 0)
-# Assign it to best.lambda variable
-best.lambda <- cv.ridge$lambda.min
-best.lambda
-plot(cv.ridge) 
-# Report test error of ridge regression 
-ridge.mod <- glmnet(x_train, y_train, alpha = 0)
-ridge.pred <- predict(ridge.mod, 
-                      s = best.lambda,
-                      newx = x_test)
-ridge_MSE <- mean((ridge.pred - y_test)^2) 
-ridge_RMSE <- sqrt(39347.87) 
-```
-
-LASSO is another coefficient shrinkage technique in which the L0 norm is replaced with the L1 norm. This applies a penalty to the coefficients equal to the absolute value of the coefficients. In LASSO methods, lambda the tuning parameter allows some coefficients to be set equal to 0, in which case they are dropped out of the regression model. In this way it also acts as a selection method for choosing the variables with the most influence. We can change lambda to any value, but in this analysis cross-validation was used to select the best value of lambda.
- 
-```{r, LASSO, include = FALSE}
-lasso.mod <- glmnet(x_train, 
-                    y_train, 
-                    alpha = 1)
-plot(lasso.mod, 
-     xvar='lambda')
-
-set.seed(1)
-cv.lasso <- cv.glmnet(x_train, 
-                      y_train,
-                      alpha = 1)
-plot(cv.lasso)
-best.lamb <- cv.lasso$lambda.min
-lasso.pred <- predict(lasso.mod, s = best.lamb, 
-                      newx = x_test)
-
-# Report test error and number of non zero coefficients for LASSO
-lasso_MSE <- mean((lasso.pred - y_test)^2)
-lasso_RMSE <- sqrt(38701.11)
-
-out <- glmnet(x_train, y_train, alpha = 1)
-lasso.coef <- predict(out, type = "coefficients", 
-                      s = best.lamb)
-lasso.coef
-lasso.coef[lasso.coef!=0]
-```
- 
+LASSO is another coefficient shrinkage technique in which the L0 norm is replaced with the L1 norm. This applies a penalty to the coefficients equal to the absolute value of the coefficients. In the LASSO method, lambda allows some coefficients to be set equal to 0, in which case they are dropped out of the regression model. In this way it  acts as a selection method for choosing the variables with the most influence. This decreases the variance of the model but increases the bias. We can change lambda to any value, but in this analysis cross-validation was used to select the best value of lambda. This method suggest a model containing 45 variables led to the lowest RMSE, this is all of the variables, so we might as well use multiple linear regression.
  
 ## Tree Based Methods
-Multiple tree based methods were explored in this analysis, starting with one simple decision tree, moving through randomForests, bagging and boosting.
+A few different tree based methods were explored in this analysis, starting with one simple decision tree, moving through bagging, randomForests and boosting. Tree based methods have the benefit of being easy to interpret but can sometimes over-simplify things.
+
+Tree methods have a limit on the number of variables, so the reduced data set from forward selection was used throughout the tree methods.
  
-Using just one decision tree gave a RMSE higher than using just ordinary least squares.
+Using just one decision tree gave a MSE higher than using just ordinary least squares, the pruned tree with the lowest cross validation error had the same number of branches as the original decision tree.
 
-```{r, Simple decision tree, include = FALSE}
-tree_house <- tree(price ~ ., 
-                   data = best_train)
+### Random Forests and Bagging
+RandomForest is a method that combines together multiple decision trees, this can help to improve prediction accuracy. Bagging is a type of randomForest, also known as Bootsrap Aggregation, in which the number of predictors that is considered at each split of the tree is equal to the total number of predictors in the data set.
 
-summary(tree_house)
-
-plot(tree_house) 
-text(tree_house, pretty = 0, cex = 0.8)
-
-# Tree indicates that sqft_living is the most important variable
-cv_tree <- cv.tree(tree_house)
-plot(cv_tree$size, cv_tree$dev, type = "b")
-
-prunedtree <- prune.tree(tree_house, best = 5)
-plot(prunedtree)
-text(prunedtree, pretty = 0)
-
-# The pruned tree and the unpruned tree have the same 
-# cross validation error so we can use either to make predictions
-
-yhat <- predict(prunedtree, newdata = best_test)
-testdata <- best_test[ ,"price"]
-plot(yhat, testdata)
-abline(0, 1)
-
-tree_MSE <- mean((yhat-testdata)^2)
-tree_RMSE <- sqrt(tree_MSE)
-```
-
-### Random Forests 
-RandomForest is a method that combines together multiple decision trees.
-
-```{r, randomForest, include = FALSE}
-set.seed(1)
-rf_tree <- randomForest(price ~ ., 
-                        data = best_train,
-                        mtry=15, 
-                        importance = TRUE)
-rf_tree
-
-yhat_bag <- predict(rf_tree, newdata = best_test)
-plot(yhat_bag, testdata)
-abline(0,1)
-
-rf_MSE <- mean((yhat_bag-testdata)^2)
-rf_RMSE <- sqrt(rf_MSE)
-
-rf_tree$ntree #this used 500 trees
-
-# try randomForest but with 100 trees...
-rf_100 <- randomForest(price ~ .,
-                       data = best_train,
-                       mtry = 15,
-                       ntree = 100,
-                       importance = TRUE)
-predict_rf <- predict(rf_100, newdata = best_test)
-plot(predict_rf, testdata)
-abline(0,1)
-
-rf_100_MSE <- mean((predict_rf-testdata)^2)
-rf_100_RMSE <- sqrt(43593.57)
-
-rf_mtry3 <- randomForest(price ~ ., 
-                         data = best_train,
-                         mtry = 3,
-                         importance = TRUE)
-
-yhat_rf <- predict(rf_mtry3, newdata = best_test)
-
-rf_mtry3_MSE <- mean((yhat_rf-testdata)^2)
-rf_mtry3_RMSE <- sqrt(43288.68)
-
-importance(rf_mtry3)
-varImpPlot(rf_mtry3)
-
-```
-
-### Bagging
-Bagging stands for bootstrap aggregation. This method uses multiple decision trees (the ‘aggregation’ part) that are each trained with different data samples, with replacement (the ‘bootstrap’ part)
-
-```{r, Bagging, include = FALSE}
-
-```
-
+Random Forests only considers a subset of the predictors, usually sqrt(p) which in this case was around 3, at each split. This reduces variance and can lead to improved models. 
 
 ### Boosting
-Boosting
 
-```{r, Boosting, include = FALSE}
-boost_house <- gbm(price ~ ., 
-                   data = best_train,
-                   distribution = "gaussian",
-                   n.trees = 5000,
-                   interaction.depth = 4)
-
-boost_house$shrinkage #lambda for boost_house is 0.1
-
-summary(boost_house)
-
-# sqft of house is the most important variable and then house age and no of bathrooms
-
-# Lets produce some partial dependence plots for sqft_living and yr_built
-# these illustrate the marginal effect of the selected variables on the response
-# after integrating out the other variables
-
-par(mfrow=c(2, 1))
-
-plot(boost_house, i = "sqft_living")
-plot(boost_house, i = "house_age")
-
-# Use boosted model to predict price on the test set
-yhat_boost <- predict(boost_house, 
-                      newdata = best_test,
-                      n.trees = 5000)
-
-boost_MSE <- mean((yhat_boost-testdata)^2)
-boost_RMSE <- sqrt(boost_MSE)
-
-
-# boosting with a different value of lambda
-boost_boston <- gbm(price ~ .,
-                    data = best_train,
-                    distribution = "gaussian",
-                    n.trees = 5000,
-                    interaction.depth = 4, 
-                    shrinkage = 0.001, 
-                    verbose = F)
-
-yhat_boost2 <- predict(boost_boston,
-                      newdata = best_test, 
-                      n.trees = 5000)
-
-boost2_MSE <- mean((yhat_boost-testdata)^2)
-boost2_RMSE <- sqrt(boost2_MSE)
-# not the best, but changing lambda has improved accuracy
-
-```
+Boosting is another tree based method in which trees are grown sequentially, with each tree 'learning' from the last. It learns more slowly than other approaches and can reduce overfitting. Two different variations of a boosted model were created, with different values of lambda, the tuning parameter, and although reducing lambda improved MSE, it was not competitive with the multiple linear regression.
 
 # Results:
+Link to [Github](https://github.com/FlorenceGalliers/C7081-assessment) repository containing analysis script.
 
-The model that gave the lowest RMSE and therefore is the final approach is...
+For regression problems the most common way to measure accuracy of a model is by minimising test error. The model that gave the lowest RMSE and therefore was the final approach chosen in this analysis is a linear model with predictor variables selected using forward selection. 15 variables were selected for this model and these were:
 
-[Github](https://github.com/FlorenceGalliers/C7081-assessment)
+* bedrooms
+* bathrooms
+* sqft_living
+* condition
+* if_basement1
+* house_age
+* city.Bellevue
+* city.Clydehill
+* city.Issaquah
+* city.Kirkland
+* city.Medina
+* city.Mercerisland
+* city.Redmond
+* city.Sammamish
+* city.Seattle
+
+It is clear that location has a large effect on house price as 9 of the variables selected in this model are all dummy variables from the original *city* variable. These selected variables only contain two differences (+condition -city.Kent) to the variables that had a significant impact on the multiple linear regression model that was fit with all of the available variables. 
 
 The objectives of this analysis were to understand which attributes of the houses can be used to most effectively construct a prediction model for house price, and to then minimise the differences between predicted and actual house price using model selection.
-
-
-
-
-```{r}
-RMSE_comparison <- c(simple_lm_RMSE,
-  multiple_lm_RMSE,
-  final_bestsub_RMSE,
-  backward_RMSE, 
-  forward_RMSE,
-  lasso_RMSE,
-  ridge_RMSE,
-  tree_RMSE,
-  rf_RMSE,
-  rf_100_RMSE,
-  rf_mtry3_RMSE,
-  boost_RMSE,
-  boost2_RMSE)
-
-plot(RMSE_comparison)
-
-```
 
 
 ## Conclusions:
