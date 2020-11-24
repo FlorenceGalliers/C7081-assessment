@@ -182,7 +182,7 @@ plot(mean.cv.errors, type = "b",
      xlab = "Model Size (number of variables)",
      ylab = "Mean Cross Validation Error",
      cex.axis = 0.8)
-which.min(mean.cv.errors) #shows that min cv.error is with 19 variables
+which.min(mean.cv.errors) #shows that min cv.error is with 1 variables
 
 mean.cv.errors[19] # get mean cv error for 19 variable model
 
@@ -194,7 +194,7 @@ variables_bestsub <- which_bestsub[19,]
 best_variables <- which(variables_bestsub == TRUE)
 
 best_train <- dummy_train[ ,best_variables]
-best_test <- dummy_test[, best_variables]
+best_test <- dummy_test[ ,best_variables]
 
 # Run linear model using only the best 15 variables selected from best subset selection
 final_bestsub <- lm(price ~ .,
@@ -237,9 +237,9 @@ plot(fwd_errors, type = "b",
      xlab = "Model Size (number of variables included)",
      ylab = "Validation Error",
      cex.axis = 0.8)
-# 16 variable model also has a low validation error
+# 15 variable model also has a low validation error
 
-# Create new test and train data sets containing only the best 16 variables as 
+# Create new test and train data sets containing only the best 24 variables as 
 # selected by forward selection
 forward_summary <- summary(forward_model)
 which_forward <- forward_summary$which
@@ -287,7 +287,7 @@ plot(bwd_errors, type = "b",
      ylab = "Validation Error",
      cex.axis = 0.8)
 
-# Create new test and train data sets containing only the best 15 variables as 
+# Create new test and train data sets containing only the best 2 variables as 
 # selected by forward selection
 backward_summary <- summary(backward_model)
 which_backward <- backward_summary$which
@@ -334,6 +334,9 @@ ridge.pred <- predict(ridge.mod,
 ridge_MSE <- mean((ridge.pred - y_test)^2) 
 ridge_RMSE <- sqrt(ridge_MSE) 
 
+# Plot the various values of L1 norm, coefficient values and the number of variables.
+plot(ridge.mod)
+
 # 7.0 LASSO Regression ####
 set.seed(1)
 # Fit lasso model
@@ -374,17 +377,19 @@ lasso_mod$lambda # show values of lamba tried
 lasso_mod$df[55] # Get number of variables in model with best lambda value
 # A 34 variable model
 
+
 estimates <- as.vector(coef(lasso_mod, s = best_lamb, exact = TRUE))
 norm. <- sum(abs(estimates))
+# Plot the different values of L1 norm and coefficient values and size of model
 plot(lasso_mod, xlim = range(0, norm., as.vector(lasso_mod$beta)))
+# Put red line in at the point where lambda was selected
 abline(v = norm., col = "red")
 
 # However from cross validation plot we can see that the error is quite stable
-# until
+# as model decreases in size from 34 to 15
 lasso_cv$cvm
 
-
-# Assign a different value of lambda to an object
+# Lets assign a different value of lambda to an object
 alt_lamb <- lasso_cv$lambda[33]
 # Use this value of lambda to make predictions on test data set
 lasso_pred2 <- predict(lasso_mod, s = alt_lamb, 
@@ -399,11 +404,12 @@ lasso2_coef # show coefficients for the model
 lasso_mod$df[33] # Get number of variables in model with alternative lambda
 # value = 15 variables
 
-
-estimates <- as.vector(coef(lasso_mod, s = best_lamb, exact = TRUE))
+#Now lets plot this value of lamba on the model
+estimates <- as.vector(coef(lasso_mod, s = alt_lamb, exact = TRUE))
 norm. <- sum(abs(estimates))
 plot(lasso_mod, xlim = range(0, norm., as.vector(lasso_mod$beta)))
 abline(v = norm., col = "red")
+# This shows a much simpler model, by increasing lambda, MSE has also not increased by much
 
 # 8.0 Simple Decision Tree ####
 set.seed(1)
@@ -574,6 +580,7 @@ RMSE_comparison <- c(simple_lm_RMSE,
                      backward_RMSE, 
                      forward_RMSE,
                      lasso_RMSE,
+                     lasso2_RMSE,
                      ridge_RMSE,
                      tree_RMSE,
                      rf_RMSE,
@@ -592,6 +599,7 @@ RMSE_names <- c("Simple Linear Model",
                 "Linear Model, variables selected by backward stepwise selection", 
                 "Linear Model, variables selected by forward stepwise selection",
                 "LASSO Regression Model",
+                "LASSO Regression Model with increased lambda",
                 "Ridge Regression Model",
                 "Basic Decision Tree",
                 "Bagging Model of randomForest, m = p",
